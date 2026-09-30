@@ -1,0 +1,68 @@
+[
+  {
+    "id": "q1",
+    "question": "How do retrieval-augmented generation systems reduce hallucinations in large language models?",
+    "keywords": ["retrieval-augmented generation", "hallucinations", "factual consistency", "DPR"],
+    "relevant_paper_titles": [
+      "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks",
+      "Self-RAG: Learning to Retrieve, Generate, and Critique through Self-Reflection",
+      "Retrieval-Augmented Generation for Large Language Models: A Survey"
+    ],
+    "expected_entities": ["RAG", "DPR", "Self-RAG", "TruthfulQA", "FEVER"],
+    "expected_claims": [
+      "RAG combines parametric memory with non-parametric retrieval to improve factual accuracy in open-domain QA.",
+      "Self-RAG achieves higher citation precision and lower hallucination rates than standard indiscriminate RAG."
+    ]
+  },
+  {
+    "id": "q2",
+    "question": "What benchmarks and metrics evaluate fine-grained factual precision in LLM text generation?",
+    "keywords": ["atomic evaluation", "factual precision", "FActScore", "HaluEval", "benchmark"],
+    "relevant_paper_titles": [
+      "FActScore: Fine-grained Atomic Evaluation of Factual Precision in Long Form Text Generation",
+      "HaluEval: A Large-Scale Hallucination Evaluation Benchmark for Large Language Models"
+    ],
+    "expected_entities": ["FActScore", "HaluEval", "Atomic Fact Precision", "ChatGPT"],
+    "expected_claims": [
+      "FActScore decomposes generated text into atomic facts and verifies each against trusted reference evidence.",
+      "LLMs fail to recognize subtle factual hallucinations in more than 30% of adversarial test cases in HaluEval."
+    ]
+  },
+  {
+    "id": "q3",
+    "question": "How does parameter-efficient fine-tuning like LoRA compare with full model fine-tuning?",
+    "keywords": ["LoRA", "low-rank adaptation", "parameter-efficient fine-tuning", "PEFT", "GLUE"],
+    "relevant_paper_titles": [
+      "LoRA: Low-Rank Adaptation of Large Language Models"
+    ],
+    "expected_entities": ["LoRA", "GPT-3", "RoBERTa", "GLUE"],
+    "expected_claims": [
+      "LoRA reduces trainable parameters by up to 10,000 times compared to full fine-tuning without inference latency."
+    ]
+  },
+  {
+    "id": "q4",
+    "question": "What are the core differences between Naive RAG, Advanced RAG, and Modular RAG?",
+    "keywords": ["Naive RAG", "Advanced RAG", "Modular RAG", "reranking", "query expansion"],
+    "relevant_paper_titles": [
+      "Retrieval-Augmented Generation for Large Language Models: A Survey",
+      "Self-RAG: Learning to Retrieve, Generate, and Critique through Self-Reflection"
+    ],
+    "expected_entities": ["Naive RAG", "Advanced RAG", "Modular RAG", "Faithfulness"],
+    "expected_claims": [
+      "Advanced RAG systems incorporating post-retrieval reranking outperform naive retrieve-then-read pipelines in context relevance."
+    ]
+  },
+  {
+    "id": "q5",
+    "question": "Can selective reflection tokens improve factual citation precision in generative models?",
+    "keywords": ["Self-RAG", "reflection tokens", "critique", "citation precision", "PopQA"],
+    "relevant_paper_titles": [
+      "Self-RAG: Learning to Retrieve, Generate, and Critique through Self-Reflection"
+    ],
+    "expected_entities": ["Self-RAG", "Llama-2", "TruthfulQA", "PopQA"],
+    "expected_claims": [
+      "Self-RAG achieves higher citation precision and lower hallucination rates than standard indiscriminate RAG."
+    ]
+  }
+]

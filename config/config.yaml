@@ -1,0 +1,31 @@
+# Project Configuration
+
+project:
+  name: nlp-project
+  version: "1.0.0"
+  description: "NLP project for text processing and analysis"
+
+paths:
+  data_raw: data/raw
+  data_processed: data/processed
+  models: models
+  logs: logs
+  notebooks: notebooks
+
+preprocessing:
+  max_seq_length: 512
+  lowercase: true
+  remove_stopwords: true
+  remove_punctuation: true
+  language: english
+
+model:
+  default: "bert-base-uncased"
+  batch_size: 32
+  learning_rate: 2.0e-5
+  epochs: 3
+  seed: 42
+
+logging:
+  level: INFO
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

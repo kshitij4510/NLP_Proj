@@ -1,0 +1,199 @@
+[
+  {
+    "title": "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks",
+    "authors": ["Patrick Lewis", "Ethan Perez", "Aleksandra Piktus", "Fabio Petroni", "Vladimir Karpukhin", "Naman Goyal", "Heinrich Küttler", "Mike Lewis", "Wen-tau Yih", "Tim Rocktäschel", "Sebastian Riedel", "Douwe Kiela"],
+    "year": 2020,
+    "venue": "NeurIPS 2020",
+    "doi": "10.48550/arXiv.2005.11401",
+    "arxiv_id": "2005.11401",
+    "url": "https://arxiv.org/abs/2005.11401",
+    "citation_count": 4820,
+    "abstract": "Large pre-trained language models store factual knowledge in their parameters, but their ability to access and manipulate that knowledge is limited. We explore retrieval-augmented generation (RAG) architectures that combine parametric and non-parametric memory. RAG models generate text by conditioning on both input sequence and retrieved Wikipedia documents via Dense Passage Retrieval (DPR). We evaluate on open-domain question answering benchmarks (Natural Questions, TriviaQA, WebQuestions) and fact verification (FEVER), achieving state-of-the-art results on multiple benchmarks while generating more specific and factual text than parametric-only seq2seq baselines.",
+    "sections": {
+      "Abstract": "Large pre-trained language models store factual knowledge in their parameters, but their ability to access and manipulate that knowledge is limited. We explore retrieval-augmented generation (RAG) architectures that combine parametric and non-parametric memory...",
+      "Introduction": "Parametric models like BART and T5 capture vast linguistic knowledge but suffer from hallucinations on specific factual claims. RAG introduces a non-parametric retrieval component using DPR over 21M Wikipedia passages to ground generations.",
+      "Methodology": "We define two variants: RAG-Sequence, where the same retrieved document conditions the entire target sequence, and RAG-Token, where each token may condition on different retrieved documents. Non-parametric memory is indexed via FAISS.",
+      "Experiments": "Evaluated on Natural Questions, TriviaQA, CuratedTREC, and FEVER. Results demonstrate superior exact match accuracy over T5-11B while using significantly fewer parameters.",
+      "Conclusion": "Hybrid parametric/non-parametric models offer greater factual consistency, modular knowledge updating without retraining, and transparent attribution to source passages."
+    },
+    "entities": [
+      {"name": "RAG", "entity_type": "MODEL"},
+      {"name": "DPR", "entity_type": "MODEL"},
+      {"name": "BART", "entity_type": "MODEL"},
+      {"name": "Natural Questions", "entity_type": "DATASET"},
+      {"name": "TriviaQA", "entity_type": "DATASET"},
+      {"name": "FEVER", "entity_type": "DATASET"},
+      {"name": "Exact Match", "entity_type": "METRIC"},
+      {"name": "F1 Score", "entity_type": "METRIC"}
+    ],
+    "claims": [
+      {
+        "statement": "RAG combines parametric memory with non-parametric retrieval to improve factual accuracy in open-domain QA.",
+        "status": "SUPPORTED"
+      },
+      {
+        "statement": "RAG models allow updating knowledge without retraining the entire parametric generator.",
+        "status": "SUPPORTED"
+      }
+    ]
+  },
+  {
+    "title": "Self-RAG: Learning to Retrieve, Generate, and Critique through Self-Reflection",
+    "authors": ["Akari Asai", "Zeqiu Wu", "Yizhong Wang", "Avirup Sil", "Hannaneh Hajishirzi"],
+    "year": 2023,
+    "venue": "ICLR 2024",
+    "doi": "10.48550/arXiv.2310.11511",
+    "arxiv_id": "2310.11511",
+    "url": "https://arxiv.org/abs/2310.11511",
+    "citation_count": 890,
+    "abstract": "Despite their remarkable capabilities, large language models (LLMs) often suffer from factual hallucinations and ungrounded generations. Standard retrieval-augmented generation (RAG) indiscriminately retrieves fixed passages regardless of necessity, which can degrade generation quality. We introduce Self-Reflective Retrieval-Augmented Generation (Self-RAG), a framework that trains a single arbitrary language model to adaptively retrieve passages on demand, and evaluate retrieved content and its own generations through special reflection tokens.",
+    "sections": {
+      "Abstract": "We introduce Self-Reflective Retrieval-Augmented Generation (Self-RAG), a framework that trains an arbitrary LM to retrieve on demand and critique its generations using reflection tokens...",
+      "Introduction": "Indiscriminate retrieval in standard RAG often introduces irrelevant or contradictory evidence. Self-RAG addresses this by outputting reflection tokens: [Retrieve], [IsRel], [IsSup], and [IsUse].",
+      "Methodology": "A Critic model predicts reflection tokens to supervise the Generator model. The generator learns when retrieval is necessary and whether generated claims are supported by retrieved passages.",
+      "Results": "Self-RAG (7B and 13B parameters) significantly outperforms standard RAG and open-source models (Llama-2, Alpaca) on TruthfulQA, PopQA, and ASQA in accuracy, citation precision, and factuality.",
+      "Conclusion": "Selective on-demand retrieval combined with self-reflection substantially reduces hallucinations while retaining fluency and efficiency."
+    },
+    "entities": [
+      {"name": "Self-RAG", "entity_type": "MODEL"},
+      {"name": "Llama-2", "entity_type": "MODEL"},
+      {"name": "TruthfulQA", "entity_type": "DATASET"},
+      {"name": "PopQA", "entity_type": "DATASET"},
+      {"name": "ASQA", "entity_type": "DATASET"},
+      {"name": "Citation Precision", "entity_type": "METRIC"},
+      {"name": "Factuality", "entity_type": "METRIC"}
+    ],
+    "claims": [
+      {
+        "statement": "Self-RAG achieves higher citation precision and lower hallucination rates than standard indiscriminate RAG.",
+        "status": "SUPPORTED"
+      }
+    ]
+  },
+  {
+    "title": "Retrieval-Augmented Generation for Large Language Models: A Survey",
+    "authors": ["Yunfan Gao", "Yun Xiong", "Xinyu Gao", "Kangxiang Jia", "Jinliu Pan", "Yuxi Bi", "Yi Dai", "Jiawei Sun", "Haofen Wang"],
+    "year": 2023,
+    "venue": "arXiv preprint",
+    "doi": "10.48550/arXiv.2312.10997",
+    "arxiv_id": "2312.10997",
+    "url": "https://arxiv.org/abs/2312.10997",
+    "citation_count": 1450,
+    "abstract": "Retrieval-Augmented Generation (RAG) has emerged as a promising paradigm to alleviate hallucinations, update domain knowledge, and provide traceable citations in large language models (LLMs). This survey provides a comprehensive taxonomy of RAG development across three evolutionary stages: Naive RAG, Advanced RAG, and Modular RAG. We systematically analyze retrieval components, generation enhancers, evaluation benchmarks, and open research challenges including multimodal RAG, low-resource adaptations, and robustness against noisy retrieval.",
+    "sections": {
+      "Abstract": "This survey provides a taxonomy of RAG systems categorized into Naive, Advanced, and Modular paradigms, summarizing evaluation metrics and identifying open research challenges...",
+      "Taxonomy": "Naive RAG follows retrieve-then-read. Advanced RAG incorporates pre-retrieval query expansion and post-retrieval reranking. Modular RAG enables flexible multi-step routing, self-correction, and iterative search.",
+      "Evaluation": "Core evaluation dimensions encompass Retrieval Quality (Precision@K, Recall@K, MRR) and Generation Quality (Faithfulness, Answer Relevance, Context Relevance).",
+      "Limitations": "Current RAG bottlenecks include handling conflicting evidence across retrieved sources, context window overflow with redundant chunks, and latency overhead from reranking models.",
+      "Conclusion": "Future directions emphasize adaptive retrieval policies, verifiable attribution pipelines, and cross-lingual robustness."
+    },
+    "entities": [
+      {"name": "Naive RAG", "entity_type": "METHOD"},
+      {"name": "Advanced RAG", "entity_type": "METHOD"},
+      {"name": "Modular RAG", "entity_type": "METHOD"},
+      {"name": "Faithfulness", "entity_type": "METRIC"},
+      {"name": "Answer Relevance", "entity_type": "METRIC"},
+      {"name": "Context Relevance", "entity_type": "METRIC"}
+    ],
+    "claims": [
+      {
+        "statement": "Advanced RAG systems incorporating post-retrieval reranking outperform naive retrieve-then-read pipelines in context relevance.",
+        "status": "SUPPORTED"
+      },
+      {
+        "statement": "Conflicting evidence among retrieved documents remains an open research bottleneck in RAG.",
+        "status": "SUPPORTED"
+      }
+    ]
+  },
+  {
+    "title": "HaluEval: A Large-Scale Hallucination Evaluation Benchmark for Large Language Models",
+    "authors": ["Junyi Li", "Xiaoxue Cheng", "Wayne Xin Zhao", "Jian-Yun Nie", "Ji-Rong Wen"],
+    "year": 2023,
+    "venue": "EMNLP 2023",
+    "doi": "10.48550/arXiv.2305.11747",
+    "arxiv_id": "2305.11747",
+    "url": "https://arxiv.org/abs/2305.11747",
+    "citation_count": 780,
+    "abstract": "Large language models (LLMs) frequently generate hallucinations that sound plausible but are factually incorrect or unsupported. We construct HaluEval, a large-scale collection of 35,000 hallucinated samples across question answering, knowledge-grounded dialogue, and text summarization. We design both automated generation pipelines using ChatGPT and extensive human verification to examine LLMs' susceptibility to hallucinations, demonstrating that even advanced LLMs struggle to distinguish nuanced factual inconsistencies.",
+    "sections": {
+      "Abstract": "We introduce HaluEval, a benchmark of 35,000 hallucinated samples across QA, dialogue, and summarization, evaluating LLMs' ability to recognize and avoid hallucinations...",
+      "Benchmark Construction": "Generated paired factual and hallucinated text across QA, dialogue, and summarization tasks. Samples include entity fabrication, relation distortion, and contradictory claims.",
+      "Evaluation": "Evaluation reveals that ChatGPT and GPT-4 fail to detect subtle hallucinations in over 30% of adversarial examples.",
+      "Conclusion": "Explicit evidence grounding and external verification steps are necessary to mitigate LLM hallucinations reliably."
+    },
+    "entities": [
+      {"name": "HaluEval", "entity_type": "BENCHMARK"},
+      {"name": "ChatGPT", "entity_type": "MODEL"},
+      {"name": "GPT-4", "entity_type": "MODEL"},
+      {"name": "Accuracy", "entity_type": "METRIC"},
+      {"name": "F1 Score", "entity_type": "METRIC"}
+    ],
+    "claims": [
+      {
+        "statement": "LLMs fail to recognize subtle factual hallucinations in more than 30% of adversarial test cases in HaluEval.",
+        "status": "SUPPORTED"
+      }
+    ]
+  },
+  {
+    "title": "FActScore: Fine-grained Atomic Evaluation of Factual Precision in Long Form Text Generation",
+    "authors": ["Sewon Min", "Kalpesh Krishna", "Xinxi Lyu", "Mike Lewis", "Wen-tau Yih", "Pang Wei Koh", "Mohit Iyyer", "Luke Zettlemoyer", "Hannaneh Hajishirzi"],
+    "year": 2023,
+    "venue": "EMNLP 2023",
+    "doi": "10.48550/arXiv.2305.14251",
+    "arxiv_id": "2305.14251",
+    "url": "https://arxiv.org/abs/2305.14251",
+    "citation_count": 610,
+    "abstract": "Evaluating the factuality of long-form text generated by LLMs is notoriously difficult because generated texts contain a mixture of supported and unsupported claims. We propose FActScore, an evaluation framework that breaks generated responses into individual atomic facts and verifies each fact against trusted reference corpora like Wikipedia. We demonstrate that FActScore strongly correlates with human judgment and reveals significant factual degradation as generation length increases.",
+    "sections": {
+      "Abstract": "FActScore breaks long-form generations into atomic facts and checks each fact against a knowledge base, providing fine-grained factuality percentages...",
+      "Methodology": "Text is parsed into atomic statements using an extraction model. Each atomic statement is checked for entailment against Wikipedia evidence using a retrieval-augmented verifier.",
+      "Results": "FActScore achieves a 0.88 Pearson correlation with human factuality judgments, substantially outperforming sentence-level ROUGE or BLEU.",
+      "Conclusion": "Atomic claim decomposition is critical for truthful, auditable evaluation of generative AI systems."
+    },
+    "entities": [
+      {"name": "FActScore", "entity_type": "METRIC"},
+      {"name": "Wikipedia", "entity_type": "DATASET"},
+      {"name": "Atomic Fact Precision", "entity_type": "METRIC"},
+      {"name": "Pearson Correlation", "entity_type": "METRIC"}
+    ],
+    "claims": [
+      {
+        "statement": "FActScore decomposes generated text into atomic facts and verifies each against trusted reference evidence.",
+        "status": "SUPPORTED"
+      }
+    ]
+  },
+  {
+    "title": "LoRA: Low-Rank Adaptation of Large Language Models",
+    "authors": ["Edward J. Hu", "Yelong Shen", "Phillip Wallis", "Zeyuan Allen-Zhu", "Yuanzhi Li", "Shean Wang", "Lu Wang", "Weizhu Chen"],
+    "year": 2021,
+    "venue": "ICLR 2022",
+    "doi": "10.48550/arXiv.2106.09685",
+    "arxiv_id": "2106.09685",
+    "url": "https://arxiv.org/abs/2106.09685",
+    "citation_count": 9200,
+    "abstract": "Full fine-tuning of large pre-trained language models is computationally prohibitive. We propose Low-Rank Adaptation (LoRA), which freezes the pre-trained model weights and injects trainable rank decomposition matrices into each layer of the Transformer architecture, greatly reducing the number of trainable parameters for downstream tasks. LoRA reduces the number of trainable parameters by 10,000 times and GPU memory requirements by 3 times compared to full fine-tuning, while maintaining or exceeding full fine-tuning performance on RoBERTa, DeBERTa, and GPT-3 benchmarks.",
+    "sections": {
+      "Abstract": "LoRA freezes pre-trained weights and injects trainable rank decomposition matrices, reducing trainable parameters by 10,000x without latency penalty...",
+      "Methodology": "For weight matrix W0 in R^{d x k}, LoRA decomposes updates as delta_W = B * A where B in R^{d x r} and A in R^{r x k} with rank r << min(d, k).",
+      "Experiments": "Evaluated on GLUE benchmark, WikiSQL, and SAMSum with GPT-3 175B. LoRA achieves competitive or superior performance to full fine-tuning with 0.01% trainable parameters.",
+      "Conclusion": "Low-rank adaptation provides an efficient, modular solution for parameter-efficient adaptation without inference latency overhead."
+    },
+    "entities": [
+      {"name": "LoRA", "entity_type": "METHOD"},
+      {"name": "GPT-3", "entity_type": "MODEL"},
+      {"name": "RoBERTa", "entity_type": "MODEL"},
+      {"name": "GLUE", "entity_type": "BENCHMARK"},
+      {"name": "SAMSum", "entity_type": "DATASET"},
+      {"name": "Accuracy", "entity_type": "METRIC"}
+    ],
+    "claims": [
+      {
+        "statement": "LoRA reduces trainable parameters by up to 10,000 times compared to full fine-tuning without inference latency.",
+        "status": "SUPPORTED"
+      }
+    ]
+  }
+]

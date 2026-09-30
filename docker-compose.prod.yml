@@ -1,0 +1,35 @@
+version: "3.9"
+
+# Production override — extends docker-compose.yml
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+services:
+  backend:
+    build:
+      target: production
+    restart: always
+    environment:
+      ENVIRONMENT: production
+    volumes:
+      - backend_uploads:/app/uploads
+      - backend_models:/app/models_cache
+      # No source mount in production
+
+  worker:
+    build:
+      target: production
+    restart: always
+    environment:
+      ENVIRONMENT: production
+    volumes:
+      - backend_uploads:/app/uploads
+      - backend_models:/app/models_cache
+
+  frontend:
+    build:
+      target: production
+    restart: always
+
+  nginx:
+    profiles: []  # Enable nginx in production (remove the "production" profile gate)
+    restart: always

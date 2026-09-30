@@ -1,0 +1,1 @@
+"""ResearchMind backend application."""
