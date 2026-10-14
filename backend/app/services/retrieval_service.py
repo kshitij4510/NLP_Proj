@@ -59,5 +59,5 @@ class RetrievalService:
             retrieval_time_ms=elapsed_ms,
             bm25_candidates=stats.get("bm25_candidates", 0),
             dense_candidates=stats.get("dense_candidates", 0),
-            reranked=query.use_reranking,
+            reranked=bool(stats.get("reranked", False)),
         )

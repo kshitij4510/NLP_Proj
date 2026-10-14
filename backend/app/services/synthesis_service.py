@@ -60,7 +60,13 @@ class SynthesisService:
         )
 
         llm = LLMService()
-        raw = await llm.generate_json(prompt)
+        from app.core.config import settings
+        if settings.LLM_PROVIDER == "demo":
+            raw = {"summary": f"Extractive review of {len(evidence_snippets)} retrieved passages for: {question_text}",
+                "key_findings": [{"paper_id": str(e["paper_id"]), "chunk_id": str(e["chunk_id"]), "source_excerpt": e["content"][:600]} for e in evidence_snippets],
+                "method_trends": [], "limitations": ["Abstract-level evidence does not independently establish scientific claims."]}
+        else:
+            raw = await llm.generate_json(prompt)
 
         # Tag all output as INTERPRETATION — not EVIDENCE (spec §8)
         synthesis = {
@@ -74,6 +80,9 @@ class SynthesisService:
             "evidence_count": len(evidence_snippets),
         }
 
+        from app.repositories.project_repo import ProjectRepository
+        project = await ProjectRepository(self._db).get(project_id)
+        await ProjectRepository(self._db).update(project_id, settings={**(project.settings or {}), "synthesis": synthesis})
         logger.info(
             "synthesis.complete",
             project_id=str(project_id),

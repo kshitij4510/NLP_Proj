@@ -1,3 +1,4 @@
+import { errorMessage } from "@/lib/errors";
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useProjects } from "@/hooks/useProjects";
@@ -28,6 +29,7 @@ export default function SearchPage() {
 
   return (
     <div className="p-8 space-y-6 max-w-4xl mx-auto">
+      {(search.error) && <p role="alert" className="text-destructive">{errorMessage(search.error)}</p>}
       <div>
         <h1 className="text-2xl font-bold">Evidence Search</h1>
         <p className="text-muted-foreground mt-1">

@@ -4,16 +4,16 @@ from __future__ import annotations
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, Query
+from fastapi import Depends, APIRouter, Query
 
-from app.api.deps import CurrentUser, DB
+from app.api.deps import CurrentUser, DB, require_project_access
 from app.models.knowledge import EntityType, RelationType, VerificationStatus
 from app.schemas.common import PaginatedResponse
 from app.repositories.knowledge_repo import (
     ClaimRepository, EntityRepository, RelationshipRepository,
 )
 
-router = APIRouter(prefix="/projects/{project_id}/knowledge", tags=["knowledge"])
+router = APIRouter(prefix="/projects/{project_id}/knowledge", tags=["knowledge"], dependencies=[Depends(require_project_access)])
 
 
 @router.get("/entities", response_model=dict)
@@ -105,6 +105,9 @@ async def list_claims(
             {
                 "id": str(c.id),
                 "claim_text": c.claim_text,
+                "paper_id": str(c.paper_id) if c.paper_id else None,
+                "evidence_links": [{"id": str(e.id), "section_title": "Source passage", "relevance_score": e.relevance_score, "paper_id": str(e.paper_id), "chunk_id": str(e.chunk_id) if e.chunk_id else None,
+                    "page_number": e.page_number, "evidence_snippet": e.evidence_snippet, "support_type": e.support_type.value} for e in c.evidence_links],
                 "verification_status": c.verification_status.value,
                 "artifact_type": c.artifact_type.value,
                 "confidence": c.confidence,

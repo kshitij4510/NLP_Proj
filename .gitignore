@@ -62,3 +62,10 @@ Thumbs.db
 *.db
 *.sqlite
 scratch/
+
+# Local tooling and provider credentials
+.tools/
+.env.*
+!.env.example
+tmp/
+

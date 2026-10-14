@@ -27,7 +27,8 @@ Evidence Summary: {evidence_summary}
 
 Instructions:
 - Base all claims on provided evidence.
-- Use academic language.
+- Use academic language. Cite evidence using its exact numeric label, such as [1].
+- Label proposed experiments and hypotheses clearly. Never invent measurements or results.
 - Do NOT introduce unsupported claims.
 - Output plain text suitable for a research paper section.
 """
@@ -61,7 +62,7 @@ class ReportService:
         question = await q_repo.get_primary(req.project_id)
         question_text = question.question if question else "Research question not specified"
 
-        papers, _ = await self._papers.list_by_project(req.project_id)
+        papers, _ = await self._papers.list_by_project(req.project_id, limit=500)
         gaps, _ = await self._gaps.list_by_project(req.project_id)
         hypotheses, _ = await self._hypotheses.list_by_project(req.project_id)
 
@@ -97,8 +98,44 @@ class ReportService:
                 evidence_summary=evidence_summary,
                 extra_context=extra,
             )
-            sections[field] = await llm.generate_text(prompt)
+            from app.core.config import settings
+            if settings.LLM_PROVIDER == "demo":
+                sections[field] = {
+                    "abstract": f"This evidence inventory examines: {question_text}. It includes {len(papers)} stored papers. No model synthesis or new experimental measurements were performed.",
+                    "background": "This draft is based on stored paper metadata and abstracts; full-text review is required.",
+                    "literature_review": "\n\n".join(f"[{i}] {p.title}: {p.abstract or 'Abstract unavailable.'}" for i, p in enumerate(papers, 1)),
+                    "research_gaps_section": "\n".join(g.description for g in gaps) or "No evidence-backed gaps have been recorded.",
+                    "hypotheses_section": "\n".join(h.statement for h in hypotheses) or "No testable hypotheses have been recorded.",
+                    "limitations": "Extractive demo draft. Abstracts do not establish experimental validity. Retrieved coverage may be incomplete.",
+                    "conclusion": "Review the evidence inventory before drawing conclusions. Configure an LLM provider for synthesis.",
+                }.get(field, "No synthesized analysis is available in demo mode.")
+            else:
+                sections[field] = await llm.generate_text(prompt)
 
+        from app.repositories.experiment_repo import ExperimentRepository, ExperimentRunRepository
+        import json
+        experiments, _ = await ExperimentRepository(self._db).list_by_project(req.project_id, limit=100)
+        designs, results = [], []
+        for experiment in experiments:
+            designs.append(f"{experiment.title}: model={json.dumps(experiment.model_spec)}, parameters={json.dumps(experiment.hyperparameters)}, metrics={json.dumps(experiment.evaluation_metrics)}. Proposed specification; execution is separate.")
+            runs, _ = await ExperimentRunRepository(self._db).list_by_experiment(experiment.id, limit=100)
+            for run in runs:
+                results.append(f"User-recorded run {run.id} for {experiment.title}: {json.dumps(run.metrics)}. Commit: {run.git_commit or 'not recorded'}. Results are supplied records, not independently reproduced.")
+        sections["results"] = "\n\n".join(results) or "No experimental runs have been recorded. No measured results are claimed."
+        sections["experimental_design"] = "\n\n".join(designs) or "No experiment specifications have been recorded."
+        if req.include_ablation:
+            sections["ablation_study"] = "\n".join(f"{e.title}: {json.dumps(e.ablations)} (proposed)" for e in experiments if e.ablations) or "No ablation measurements recorded."
+        if settings.LLM_PROVIDER == "demo":
+            from collections import Counter
+            methods, datasets, metrics = Counter(), Counter(), Counter()
+            comparison = []
+            for i, paper in enumerate(papers, 1):
+                entities = (paper.raw_metadata or {}).get("extracted_entities", {})
+                methods.update(entities.get("METHOD", [])); datasets.update(entities.get("DATASET", [])); metrics.update(entities.get("METRIC", []))
+                comparison.append(f"[{i}] {paper.title}: methods={', '.join(entities.get('METHOD', [])) or 'not extracted'}; datasets={', '.join(entities.get('DATASET', [])) or 'not extracted'}; metrics={', '.join(entities.get('METRIC', [])) or 'not extracted'}.")
+            sections["research_landscape"] = f"Extracted source mentions, not comparative performance: methods {dict(methods.most_common(10))}; datasets {dict(datasets.most_common(10))}; metrics {dict(metrics.most_common(10))}."
+            sections["method_comparison"] = "\n\n".join(comparison)
+            sections["future_work"] = "Review full texts, annotate evaluation queries, execute the proposed experiments, and report measured results with provenance."
         # Update report with sections
         await self._reports.update(report.id, **sections, status=ReportStatus.VERIFYING)
 
@@ -118,8 +155,8 @@ class ReportService:
         # Only COMPLETED if verification passes (0 unsupported) or user accepts
         final_status = (
             ReportStatus.COMPLETED
-            if unsupported == 0
-            else ReportStatus.COMPLETED  # allow completion; UI shows warning
+            if req.verify_claims and unsupported == 0 and settings.LLM_PROVIDER != "demo"
+            else ReportStatus.DRAFT
         )
 
         final = await self._reports.update(
@@ -136,7 +173,7 @@ class ReportService:
             project_id=str(req.project_id),
             unsupported_claims=unsupported,
         )
-        return final  # type: ignore[return-value]
+        return await self.get(report.id)
 
     async def get(self, report_id: uuid.UUID) -> Report:
         return await self._reports.get_with_citations(report_id)  # type: ignore[return-value]
@@ -144,7 +181,8 @@ class ReportService:
     async def list(
         self, project_id: uuid.UUID, *, offset: int = 0, limit: int = 20
     ) -> tuple:
-        return await self._reports.list_by_project(project_id, offset=offset, limit=limit)
+        items, total = await self._reports.list_by_project(project_id, offset=offset, limit=limit)
+        return [await self.get(item.id) for item in items], total
 
     async def to_markdown(self, report_id: uuid.UUID) -> str:
         """Convert report to formatted academic Markdown with all 15 sections and bibliography."""
@@ -172,13 +210,19 @@ class ReportService:
             "## References\n",
         ]
 
-        if report.citations:
-            for i, cit in enumerate(report.citations, 1):
-                sections.append(f"[{i}] {cit.formatted_citation}\n")
-        else:
+        references = {}
+        for cit in report.citations:
+            if cit.paper_id not in references or cit.style == CitationStyle.IEEE:
+                references[cit.paper_id] = cit
+        ordered = sorted(references.values(), key=lambda c: int(c.in_text_citation[1:-1]) if c.in_text_citation and c.in_text_citation[1:-1].isdigit() else 1000000)
+        for i, cit in enumerate(ordered, 1):
+            meta = cit.metadata_snapshot or {}
+            citation_text = cit.formatted_citation if cit.style == CitationStyle.IEEE else ", ".join(str(value) for value in [", ".join(meta.get("authors") or []), meta.get("title"), meta.get("venue"), meta.get("year")] if value)
+            sections.append(f"[{i}] {citation_text}\n")
+        if not ordered:
             sections.append("*(No references recorded)*\n")
 
-        return "\n".join(sections)
+        return "\n".join(sections) + "\n"
 
     async def to_bibtex(self, report_id: uuid.UUID) -> str:
         """Export all citations associated with the report as BibTeX."""
@@ -186,16 +230,13 @@ class ReportService:
         if not report:
             raise ValueError("Report not found")
 
-        bib_entries = []
+        from app.services.citation_service import CitationService
+        entries = {}
         for cit in report.citations:
-            if cit.style == CitationStyle.BIBTEX or (cit.formatted_citation and cit.formatted_citation.startswith("@")):
-                bib_entries.append(cit.formatted_citation)
-            elif cit.metadata_snapshot:
-                # Format bibtex on the fly from snapshot
-                from app.services.citation_service import CitationService
-                bib_entries.append(CitationService.format_bibtex(cit.metadata_snapshot))
-
-        return "\n\n".join(bib_entries) if bib_entries else "% No BibTeX citations found"
+            if cit.paper_id not in entries or cit.style == CitationStyle.BIBTEX:
+                entries[cit.paper_id] = cit
+        bib_entries = [CitationService.format_bibtex(c.metadata_snapshot or {}) for c in entries.values()]
+        return "\n\n".join(bib_entries) if bib_entries else "% No verified references are attached to this source-specific draft.\n"
 
     @staticmethod
     def _build_evidence_summary(papers: list, gaps: list) -> str:
@@ -203,8 +244,15 @@ class ReportService:
         if papers:
             parts.append(
                 "Key papers: "
-                + "; ".join(f"{p.title[:80]} ({p.year})" for p in papers[:5])
+                + "; ".join(f"[{i}] {p.title} ({p.year}): {p.abstract or 'No abstract available; title alone is not evidence.'}" for i, p in enumerate(papers, 1))
             )
         if gaps:
             parts.append("Research gaps: " + "; ".join(g.title for g in gaps[:5]))
         return "\n".join(parts)
+
+    async def to_ieee(self, report_id: uuid.UUID) -> str:
+        from app.services.ieee_export import render_ieee
+        report = await self.get(report_id)
+        if not report:
+            raise ValueError("Report not found")
+        return render_ieee(report)

@@ -40,6 +40,6 @@ class ReportRead(IDSchema, TimestampSchema):
 
 class ReportGenerateRequest(BaseSchema):
     project_id: uuid.UUID
-    citation_styles: List[CitationStyle] = [CitationStyle.APA]
+    citation_styles: List[CitationStyle] = [CitationStyle.IEEE, CitationStyle.APA, CitationStyle.BIBTEX]
     include_ablation: bool = True
     verify_claims: bool = True

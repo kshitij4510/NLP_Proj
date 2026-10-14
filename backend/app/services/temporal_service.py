@@ -61,7 +61,9 @@ class TemporalService:
         # Aggregate by year
         year_papers: Dict[int, List[Paper]] = defaultdict(list)
         for p in papers:
-            year = p.year or 2023  # fallback if year unknown
+            if not p.year:
+                continue
+            year = p.year
             year_papers[year].append(p)
 
         timeline_points: List[TemporalPoint] = []

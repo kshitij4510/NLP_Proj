@@ -4,15 +4,15 @@ from __future__ import annotations
 import uuid
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Query, status
+from fastapi import HTTPException, Depends, APIRouter, Query, status
 
-from app.api.deps import CurrentUser, DB
+from app.api.deps import CurrentUser, DB, require_project_access
 from app.models.experiment import ExperimentStatus
 from app.schemas.common import PaginatedResponse
 from app.schemas.experiment import ExperimentCreate, ExperimentRead, ExperimentRunRead
 from app.services.experiment_service import ExperimentService
 
-router = APIRouter(prefix="/projects/{project_id}/experiments", tags=["experiments"])
+router = APIRouter(prefix="/projects/{project_id}/experiments", tags=["experiments"], dependencies=[Depends(require_project_access)])
 
 
 @router.post("", response_model=ExperimentRead, status_code=status.HTTP_201_CREATED)
@@ -53,6 +53,9 @@ async def get_experiment(
     project_id: uuid.UUID, experiment_id: uuid.UUID, user: CurrentUser, db: DB
 ):
     svc = ExperimentService(db)
+    experiment = await svc.get(experiment_id)
+    if experiment.project_id != project_id:
+        raise HTTPException(404, "Experiment not found")
     return await svc.get(experiment_id)
 
 
@@ -66,6 +69,9 @@ async def record_run(
 ):
     """Record a completed experiment run with metrics and provenance."""
     svc = ExperimentService(db)
+    experiment = await svc.get(experiment_id)
+    if experiment.project_id != project_id:
+        raise HTTPException(404, "Experiment not found")
     return await svc.record_run(
         experiment_id=experiment_id,
         metrics=payload.get("metrics", {}),
@@ -86,6 +92,9 @@ async def list_runs(
     page_size: int = Query(default=20, ge=1, le=100),
 ):
     svc = ExperimentService(db)
+    experiment = await svc.get(experiment_id)
+    if experiment.project_id != project_id:
+        raise HTTPException(404, "Experiment not found")
     offset = (page - 1) * page_size
     items, total = await svc.list_runs(experiment_id, offset=offset, limit=page_size)
     pages = (total + page_size - 1) // page_size

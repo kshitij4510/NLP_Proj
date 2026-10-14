@@ -9,6 +9,7 @@ import { useLogout } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 
 const mainNav = [
+  { to: "/about", icon: BookOpen, label: "About & bibliography" },
   { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/planner", icon: Compass, label: "Research Planner" },
   { to: "/literature", icon: BookOpen, label: "Literature Explorer" },
@@ -17,10 +18,10 @@ const mainNav = [
   { to: "/gaps", icon: AlertCircle, label: "Research Gaps" },
   { to: "/hypotheses", icon: Sparkles, label: "Hypothesis Lab" },
   { to: "/experiments", icon: FlaskConical, label: "Experiments & Runs" },
-  { to: "/reports", icon: FileText, label: "Reports & BibTeX" },
+  { to: "/reports", icon: FileText, label: "IEEE Papers & Reports" },
   { to: "/search", icon: Search, label: "Hybrid Search" },
   { to: "/projects", icon: FolderKanban, label: "All Projects" },
-  { to: "/settings", icon: Settings, label: "Settings & Models" },
+  { to: "/settings", icon: Settings, label: "Runtime Diagnostics" },
 ];
 
 export function AppLayout() {
@@ -40,7 +41,7 @@ export function AppLayout() {
               ResearchMind
             </span>
             <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-mono">
-              AI Scientist
+              Research notebook
             </span>
           </div>
         </div>

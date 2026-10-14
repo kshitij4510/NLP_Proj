@@ -47,7 +47,7 @@ class JobRepository(BaseRepository[ResearchJob]):
             .where(
                 and_(
                     ResearchJob.project_id == project_id,
-                    ResearchJob.status == JobStatus.RUNNING,
+                    ResearchJob.status.in_([JobStatus.PENDING, JobStatus.RUNNING, JobStatus.RETRYING]),
                 )
             )
             .limit(1)
@@ -81,7 +81,7 @@ class JobRepository(BaseRepository[ResearchJob]):
         job = await self.get(job_id)
         if job is None:
             return
-        new_status = JobStatus.RETRYING if job.can_retry else JobStatus.FAILED
+        new_status = JobStatus.FAILED
         await self.db.execute(
             update(ResearchJob)
             .where(ResearchJob.id == job_id)

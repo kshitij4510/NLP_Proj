@@ -25,6 +25,9 @@ async def enqueue_full_pipeline(
     job_id: uuid.UUID,
     start_stage: JobStage = JobStage.PLANNING,
 ) -> str:
+    if settings.DATABASE_URL.startswith("sqlite"):
+        from app.workers.local import enqueue
+        return enqueue(project_id, job_id, start_stage, "pipeline", **{})
     pool = await _get_pool()
     job = await pool.enqueue_job(
         "run_full_pipeline",
@@ -48,6 +51,9 @@ async def enqueue_discovery(
     query: str,
     sources: Optional[List[str]] = None,
 ) -> str:
+    if settings.DATABASE_URL.startswith("sqlite"):
+        from app.workers.local import enqueue
+        return enqueue(project_id, job_id, JobStage.DISCOVERY, "discovery", **{"query": query, "sources": sources})
     pool = await _get_pool()
     job = await pool.enqueue_job(
         "run_discovery_task",
@@ -64,6 +70,9 @@ async def enqueue_ingestion(
     job_id: uuid.UUID,
     paper_id: Optional[uuid.UUID] = None,
 ) -> str:
+    if settings.DATABASE_URL.startswith("sqlite"):
+        from app.workers.local import enqueue
+        return enqueue(project_id, job_id, JobStage.INGESTION, "ingestion", **{"paper_id": paper_id})
     pool = await _get_pool()
     job = await pool.enqueue_job(
         "run_ingestion_task",
@@ -78,6 +87,9 @@ async def enqueue_synthesis(
     project_id: uuid.UUID,
     job_id: uuid.UUID,
 ) -> str:
+    if settings.DATABASE_URL.startswith("sqlite"):
+        from app.workers.local import enqueue
+        return enqueue(project_id, job_id, JobStage.SYNTHESIS, "pipeline", **{})
     pool = await _get_pool()
     job = await pool.enqueue_job(
         "run_synthesis_task",
@@ -91,6 +103,9 @@ async def enqueue_report(
     project_id: uuid.UUID,
     job_id: uuid.UUID,
 ) -> str:
+    if settings.DATABASE_URL.startswith("sqlite"):
+        from app.workers.local import enqueue
+        return enqueue(project_id, job_id, JobStage.REPORTING, "pipeline", **{})
     pool = await _get_pool()
     job = await pool.enqueue_job(
         "run_report_task",

@@ -25,7 +25,8 @@ class KeyphraseExtractor:
         self._model = None
 
     def _load(self) -> None:
-        if self._model is not None:
+        from app.core.config import settings
+        if settings.EMBEDDING_MODEL == "lexical-hash" or self._model is not None:
             return
         try:
             from keybert import KeyBERT

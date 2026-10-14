@@ -44,7 +44,14 @@ class IngestionPipeline:
         Stage 1: Discover papers from academic APIs.
         Returns summary of papers added.
         """
-        results = await discover_papers(query, limit_per_source, sources)
+        if self._db.bind.dialect.name == "sqlite":
+            from app.ingestion.local_corpus import search_corpus
+            results = search_corpus(query, limit=max(60, limit_per_source))
+            if not results:
+                from app.core.exceptions import ExternalAPIError
+                raise ExternalAPIError("No local corpus matches. Run scripts/expand_nlp_corpus.py to refresh the NLP corpus, or use a more specific NLP query.")
+        else:
+            results = await discover_papers(query, limit_per_source, sources)
 
         paper_svc = PaperService(self._db)
         # Use system user id 0 equivalent — this is called from a worker, not a user request
@@ -104,14 +111,28 @@ class IngestionPipeline:
     async def _ingest_single_paper(self, paper, project_id: uuid.UUID) -> None:
         paper_id = paper.id
 
+        if not paper.local_pdf_path and (not paper.pdf_url or self._db.bind.dialect.name == "sqlite"):
+            if not paper.abstract:
+                await self._paper_repo.update_status(paper_id, PaperStatus.SKIPPED)
+                return
+            from app.repositories.paper_repo import PaperChunkRepository
+            if await PaperChunkRepository(self._db).count(paper_id=paper_id):
+                return
+            stats = await ExtractionPipeline(self._db).process_paper(paper_id, project_id, [{
+                "title": "Abstract", "section_type": "abstract", "content": paper.abstract,
+                "page_start": None, "page_end": None}])
+            await self._paper_repo.update(paper_id, status=PaperStatus.PROCESSED,
+                raw_metadata={**(paper.raw_metadata or {}), "indexed_source": "abstract", "extraction_stats": stats})
+            return
+
         # Step 1 — Download PDF
-        if not paper.pdf_url:
+        if not paper.pdf_url and not paper.local_pdf_path:
             logger.info("ingestion.no_pdf_url", paper_id=str(paper_id))
             await self._paper_repo.update_status(paper_id, PaperStatus.SKIPPED)
             return
 
         await self._paper_repo.update_status(paper_id, PaperStatus.DOWNLOADING)
-        local_path = await download_pdf(paper.pdf_url, paper_id)
+        local_path = paper.local_pdf_path or await download_pdf(paper.pdf_url, paper_id)
         await self._paper_repo.update(paper_id, local_pdf_path=local_path, status=PaperStatus.DOWNLOADED)
 
         # Step 2 — Extract PDF structure

@@ -45,6 +45,7 @@ export const projectsApi = {
 
 // ── Papers ────────────────────────────────────────────────────────────────────
 export const papersApi = {
+  discover: (projectId: string, query: string) => apiClient.post(`/projects/${projectId}/papers/discover/search`, { query }, { timeout: 180_000 }).then(r => r.data),
   add: (projectId: string, data: { doi?: string; arxiv_id?: string; pdf_url?: string; title?: string }) =>
     apiClient.post<Paper>(`/projects/${projectId}/papers`, data).then((r) => r.data),
 
@@ -74,7 +75,7 @@ export const retrievalApi = {
     top_k?: number;
     use_reranking?: boolean;
     year_min?: number;
-    year_max?: number;
+    metadata_filters?: Record<string, string>; year_max?: number;
   }) => apiClient.post<RetrievalResult>("/retrieval/search", data).then((r) => r.data),
 };
 
@@ -148,11 +149,20 @@ export const experimentsApi = {
 
 // ── Reports ───────────────────────────────────────────────────────────────────
 export const reportsApi = {
+  download: async (projectId: string, reportId: string, format: "ieee" | "markdown" | "bibtex") => {
+    const response = await apiClient.get(`/projects/${projectId}/reports/${reportId}/export/${format}`, { responseType: "blob" });
+    const url = URL.createObjectURL(response.data);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `report_${reportId}.${format === "ieee" ? "tex" : format === "bibtex" ? "bib" : "md"}`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  },
   generate: (projectId: string, data: { citation_styles?: CitationStyle[]; verify_claims?: boolean }) =>
     apiClient.post<Report>(`/projects/${projectId}/reports/generate`, {
       project_id: projectId,
       ...data,
-    }).then((r) => r.data),
+    }, { timeout: 180_000 }).then((r) => r.data),
 
   list: (projectId: string) =>
     apiClient.get<PaginatedResponse<Report>>(`/projects/${projectId}/reports`).then((r) => r.data),

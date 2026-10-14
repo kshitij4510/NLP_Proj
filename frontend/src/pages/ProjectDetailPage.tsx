@@ -1,12 +1,13 @@
 import { useParams, Link } from "react-router-dom";
 import { useProject, useProjectSummary, useTriggerPipeline } from "@/hooks/useProjects";
-import { useActiveJob } from "@/hooks/useJobs";
+import { useActiveJob, useJobs } from "@/hooks/useJobs";
 import { usePapers } from "@/hooks/usePapers";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PipelineStatus } from "@/components/common/PipelineStatus";
 import { Loader2, Play, FileText, BookOpen, Lightbulb, FlaskConical, ArrowLeft } from "lucide-react";
+import { errorMessage } from "@/lib/errors";
 import { formatDate, STATUS_COLORS } from "@/lib/utils";
 
 export default function ProjectDetailPage() {
@@ -14,6 +15,7 @@ export default function ProjectDetailPage() {
   const { data: project, isLoading } = useProject(id!);
   const { data: summary } = useProjectSummary(id!);
   const { data: activeJob } = useActiveJob(id!);
+  const { data: jobs } = useJobs(id!);
   const { data: papersData } = usePapers(id!, { page_size: 5 } as any);
   const triggerPipeline = useTriggerPipeline(id!);
 
@@ -43,7 +45,7 @@ export default function ProjectDetailPage() {
         </div>
         <Button
           onClick={() => triggerPipeline.mutate(undefined)}
-          disabled={triggerPipeline.isPending || activeJob?.status === "running"}
+          disabled={triggerPipeline.isPending || !!activeJob}
         >
           {triggerPipeline.isPending ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -54,6 +56,7 @@ export default function ProjectDetailPage() {
         </Button>
       </div>
 
+      {triggerPipeline.error && <p role="alert" className="text-destructive">{errorMessage(triggerPipeline.error)}</p>}
       {/* Research question */}
       {project.research_questions?.[0] && (
         <Card className="border-primary/20 bg-primary/5">
@@ -90,7 +93,8 @@ export default function ProjectDetailPage() {
           <CardTitle className="text-base">Pipeline Status</CardTitle>
         </CardHeader>
         <CardContent>
-          <PipelineStatus job={activeJob} />
+          <PipelineStatus job={activeJob || jobs?.items[0]} />
+          {jobs?.items[0]?.status === "completed" && <Link className="text-primary underline" to={`/reports?project=${id}`}>View generated reports</Link>}
         </CardContent>
       </Card>
 

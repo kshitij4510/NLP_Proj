@@ -62,7 +62,7 @@ class HybridRetriever:
 
         # Run BM25 + dense in parallel
         bm25_results, dense_results = await self._run_parallel(
-            query, project_id, candidate_k, year_min, year_max
+            query, project_id, candidate_k, year_min, year_max, (metadata_filters or {}).get("paper_id")
         )
 
         stats = {
@@ -99,6 +99,7 @@ class HybridRetriever:
                     e.final_score = float(score_map[e.content])
             evidence.sort(key=lambda x: x.final_score, reverse=True)
 
+        stats["reranked"] = bool(use_reranking and self._reranker._model is not None)
         return evidence[:top_k], stats
 
     # ── Internal methods ──────────────────────
@@ -110,15 +111,11 @@ class HybridRetriever:
         k: int,
         year_min: Optional[int],
         year_max: Optional[int],
+        paper_id: Optional[str] = None,
     ) -> Tuple[List[Tuple[uuid.UUID, float]], List[Tuple[uuid.UUID, float]]]:
-        import asyncio
-        bm25_task = asyncio.create_task(
-            self._bm25.search(query, project_id, top_k=k, year_min=year_min, year_max=year_max)
-        )
-        dense_task = asyncio.create_task(
-            self._dense.search(query, project_id, top_k=k, year_min=year_min, year_max=year_max)
-        )
-        bm25_results, dense_results = await asyncio.gather(bm25_task, dense_task)
+        # An AsyncSession cannot execute concurrent SQL statements safely.
+        bm25_results = await self._bm25.search(query, project_id, top_k=k, year_min=year_min, year_max=year_max, paper_id=paper_id)
+        dense_results = await self._dense.search(query, project_id, top_k=k, year_min=year_min, year_max=year_max, paper_id=paper_id)
         return bm25_results, dense_results
 
     @staticmethod
@@ -143,8 +140,8 @@ class HybridRetriever:
             bm25_rank, bm25_score = bm25_map.get(cid, (len(bm25_results), 0.0))
             dense_rank, dense_score = dense_map.get(cid, (len(dense_results), 0.0))
 
-            rrf_bm25 = bm25_weight * (1.0 / (k + bm25_rank + 1))
-            rrf_dense = dense_weight * (1.0 / (k + dense_rank + 1))
+            rrf_bm25 = bm25_weight * (1.0 / (k + bm25_rank + 1)) if cid in bm25_map else 0.0
+            rrf_dense = dense_weight * (1.0 / (k + dense_rank + 1)) if cid in dense_map else 0.0
             fused = rrf_bm25 + rrf_dense
 
             scored.append((cid, dense_score, bm25_score, fused))
@@ -157,8 +154,15 @@ class HybridRetriever:
         filters: Dict[str, Any],
     ) -> List[Tuple[uuid.UUID, float, float, float]]:
         """Apply metadata filters — currently supports 'source' filter."""
-        # For more complex filters, join against paper table
-        return fused  # placeholder — full filter logic in v2
+        stmt = select(PaperChunk.id).join(Paper, PaperChunk.paper_id == Paper.id)
+        if filters.get("paper_id"):
+            stmt = stmt.where(Paper.id == uuid.UUID(str(filters["paper_id"])))
+        if filters.get("source"):
+            stmt = stmt.where(Paper.source == filters["source"])
+        if filters.get("venue"):
+            stmt = stmt.where(Paper.venue.ilike("%" + str(filters["venue"]) + "%"))
+        allowed = set((await self._db.execute(stmt)).scalars())
+        return [item for item in fused if item[0] in allowed]
 
     async def _hydrate(
         self,

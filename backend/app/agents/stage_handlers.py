@@ -44,6 +44,11 @@ async def handle_planning(ctx: WorkflowContext, db: AsyncSession) -> PlanningOut
     question = await q_repo.get_primary(project_id)
     question_text = question.question if question else ctx.stage_outputs.get("query", "")
 
+    from app.services.research_service import ResearchService
+    plan = await ResearchService(db).get_research_plan(project_id)
+    if plan and plan.get("is_approved"):
+        return PlanningOutput(search_queries=(plan.get("keywords") or [question_text])[:5],
+            sources=["semantic_scholar", "openalex", "arxiv"], plan_summary="Using approved research plan")
     llm = LLMService()
     prompt = f"""Generate 3-5 academic search queries for this research question.
 Question: {question_text}
@@ -70,6 +75,8 @@ async def handle_discovery(ctx: WorkflowContext, db: AsyncSession) -> DiscoveryO
     from app.ingestion.ingestion_pipeline import IngestionPipeline
 
     planning_out: PlanningOutput = ctx.stage_outputs.get(JobStage.PLANNING.value)
+    if not planning_out:
+        planning_out = await handle_planning(ctx, db)
     queries = planning_out.search_queries if planning_out else ["machine learning"]
     sources = planning_out.sources if planning_out else ["semantic_scholar", "arxiv"]
 
@@ -102,7 +109,7 @@ async def handle_ingestion(ctx: WorkflowContext, db: AsyncSession) -> IngestionO
 
     pipeline = IngestionPipeline(db)
     project_id = uuid.UUID(ctx.project_id)
-    result = await pipeline.run_ingestion(project_id=project_id, batch_size=10)
+    result = await pipeline.run_ingestion(project_id=project_id, batch_size=200)
 
     output = IngestionOutput(
         processed=result.get("processed", 0),
@@ -265,15 +272,8 @@ async def handle_experiment_design(
     exp_svc = ExperimentService(db)
     total = 0
     for hyp in hypotheses[:5]:  # cap at 5 to avoid excessive LLM calls
-        try:
-            await exp_svc.design_from_hypothesis(project_id, hyp.id)
-            total += 1
-        except Exception as exc:
-            logger.warning(
-                "stage.experiment_design.error",
-                hypothesis_id=str(hyp.id),
-                error=str(exc),
-            )
+        await exp_svc.design_from_hypothesis(project_id, hyp.id)
+        total += 1
 
     output = ExperimentDesignOutput(experiments_designed=total)
     logger.info(
@@ -320,7 +320,7 @@ async def handle_reporting(ctx: WorkflowContext, db: AsyncSession) -> ReportingO
     report = await report_svc.generate(
         ReportGenerateRequest(
             project_id=project_id,
-            citation_styles=[CitationStyle.APA, CitationStyle.BIBTEX],
+            citation_styles=[CitationStyle.IEEE, CitationStyle.APA, CitationStyle.BIBTEX],
             include_ablation=True,
             verify_claims=True,
         )

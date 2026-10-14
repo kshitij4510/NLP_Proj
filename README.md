@@ -464,3 +464,19 @@ See `docs/deployment/deployment-guide.md` for the full security checklist.
 ## License
 
 MIT
+
+
+### Local sign-in and IEEE manuscripts
+
+Run `backend/.venv/Scripts/python.exe backend/local_main.py` from the repository root.
+Local mode always uses `backend/researchmind_local.db`, independent of the working directory.
+To provision an account, set `LOCAL_ACCOUNT_PASSWORD` and optionally `LOCAL_ACCOUNT_EMAIL`,
+then run `backend/.venv/Scripts/python.exe backend/scripts/create_local_account.py`.
+The script verifies login and preserves existing passwords.
+
+In Research Reports, select a project, generate a report, and download IEEE Paper (.tex).
+The source uses IEEEtran conference mode and a numbered bibliography from stored metadata.
+Compile in Overleaf or a TeX installation containing IEEEtran; replace author and affiliation details.
+Demo mode exports an extractive literature inventory without inventing experiment results.
+Verification concerns stored claims and does not validate every sentence of generated prose.
+Review manuscripts and citations before submitting. PDF compilation is not performed by the backend.

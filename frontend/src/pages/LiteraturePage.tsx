@@ -1,5 +1,6 @@
+import { useSearchParams } from "react-router-dom";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useProjects } from "@/hooks/useProjects";
 import { papersApi } from "@/api/endpoints";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -10,17 +11,20 @@ import {
   BookOpen, ExternalLink, Table as TableIcon, ListFilter,
   Search, FileText, ArrowUpDown, Filter, Sparkles
 } from "lucide-react";
+import { Link } from "react-router-dom";
+import { errorMessage } from "@/lib/errors";
 import type { Paper } from "@/types";
 
 export default function LiteraturePage() {
-  const { data: projects } = useProjects({ page_size: 50 });
-  const [selectedProjectId, setSelectedProjectId] = useState<string>("");
+  const { data: projects } = useProjects({ page_size: 200 });
+  const [selectedProjectId, setSelectedProjectId] = useState<string>(useSearchParams()[0].get("project") || "");
   const [searchFilter, setSearchFilter] = useState<string>("");
+  const [discoveryQuery, setDiscoveryQuery] = useState("retrieval augmented generation hallucination");
   const [activeTab, setActiveTab] = useState<"papers" | "matrix">("matrix");
 
-  const { data: papersData, isLoading } = useQuery({
+  const { data: papersData, isLoading, error, refetch } = useQuery({
     queryKey: ["papers", selectedProjectId],
-    queryFn: () => papersApi.list(selectedProjectId, { page_size: 50 } as any),
+    queryFn: () => papersApi.list(selectedProjectId, { page_size: 200 } as any),
     enabled: !!selectedProjectId,
   });
 
@@ -32,13 +36,17 @@ export default function LiteraturePage() {
     p.venue?.toLowerCase().includes(searchFilter.toLowerCase())
   );
 
+  const discover = useMutation({
+    mutationFn: () => papersApi.discover(selectedProjectId, discoveryQuery),
+    onSuccess: () => refetch(),
+  });
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b pb-6">
         <div>
           <div className="flex items-center gap-2 text-primary font-semibold text-sm mb-1 uppercase tracking-wider">
-            <BookOpen className="h-4 w-4" /> Academic Literature Discovery & Synthesis (Module C & H)
+            <BookOpen className="h-4 w-4" /> Academic Literature Discovery & Deep Synthesis
           </div>
           <h1 className="text-3xl font-bold tracking-tight">Literature Explorer</h1>
           <p className="text-muted-foreground text-sm mt-1">
@@ -95,6 +103,12 @@ export default function LiteraturePage() {
         </div>
       </div>
 
+      <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); discover.mutate(); }}>
+        <Input value={discoveryQuery} onChange={(e) => setDiscoveryQuery(e.target.value)} placeholder="Academic discovery query" />
+        <Button disabled={!selectedProjectId || !discoveryQuery.trim() || discover.isPending}> {discover.isPending ? "Discovering?" : "Discover Papers"}</Button>
+      </form>
+      {(error || discover.error) && <p role="alert" className="text-destructive">{errorMessage(error || discover.error)}</p>}
+      {discover.data && <p className="text-sm">Added {discover.data.added} papers; skipped {discover.data.skipped} duplicates.</p>}
       {isLoading ? (
         <div className="flex h-64 items-center justify-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
@@ -108,11 +122,11 @@ export default function LiteraturePage() {
                 <TableIcon className="h-4 w-4 text-primary" /> Literature Synthesis Matrix
               </span>
               <Badge variant="outline" className="text-xs">
-                {filteredPapers.length} Comparative Studies
+                {filteredPapers.length} Papers
               </Badge>
             </CardTitle>
             <CardDescription className="text-xs">
-              Direct architectural comparison: Paper vs Method vs Datasets vs Metrics vs Result vs Limitations.
+              Methods, datasets, and metrics are extracted mentions. Abstract excerpts are source text; missing information is marked explicitly.
             </CardDescription>
           </CardHeader>
           <div className="overflow-x-auto">
@@ -123,31 +137,27 @@ export default function LiteraturePage() {
                   <th className="p-3.5 min-w-[130px]">Primary Method</th>
                   <th className="p-3.5 min-w-[140px]">Evaluated Datasets</th>
                   <th className="p-3.5 min-w-[110px]">Key Metrics</th>
-                  <th className="p-3.5 min-w-[220px]">Main Finding / Result</th>
+                  <th className="p-3.5 min-w-[220px]">Source Abstract Excerpt</th>
                   <th className="p-3.5 min-w-[200px]">Limitation</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {filteredPapers.map((paper, idx) => {
-                  // Synthesize comparative columns from metadata and abstract
-                  const isRAG = paper.title.toLowerCase().includes("retrieval") || paper.title.toLowerCase().includes("rag");
-                  const isPEFT = paper.title.toLowerCase().includes("lora");
-                  const isEval = paper.title.toLowerCase().includes("eval") || paper.title.toLowerCase().includes("score");
-
-                  const method = isRAG ? "RAG + DPR / Reflection" : isPEFT ? "Low-Rank Adaptation (LoRA)" : isEval ? "Atomic Fact Verification" : "Transformer Variant";
-                  const datasets = isRAG ? "Natural Questions, TriviaQA" : isPEFT ? "GLUE, WikiSQL" : isEval ? "TruthfulQA, HaluEval" : "Wikipedia";
-                  const metric = isRAG ? "Exact Match, Faithfulness" : isPEFT ? "Accuracy, VRAM (GB)" : isEval ? "Atomic Precision, F1" : "F1 Score";
-                  const result = paper.abstract ? paper.abstract.slice(0, 140) + "..." : "Significantly outperforms baselines.";
-                  const limitation = isRAG ? "Latency overhead from retrieval; noisy passages" : isPEFT ? "Cannot inject massive new non-parametric knowledge" : "High computation cost for atomic breakdown";
+                  const extracted = paper.raw_metadata?.extracted_entities || {};
+                  const method = (extracted.METHOD || []).join(", ") || "Not extracted";
+                  const datasets = (extracted.DATASET || []).join(", ") || "Not extracted";
+                  const metric = (extracted.METRIC || []).join(", ") || "Not extracted";
+                  const result = paper.abstract ? paper.abstract.slice(0, 240) + (paper.abstract.length > 240 ? "?" : "") : "No abstract available";
+                  const limitation = paper.raw_metadata?.limitation_excerpt || "Not extracted from source";
 
                   return (
                     <tr key={paper.id} className="hover:bg-muted/40 transition-colors">
                       <td className="p-3.5">
-                        <div className="font-semibold text-foreground leading-snug">{paper.title}</div>
+                        <div className="font-semibold text-foreground leading-snug"><Link className="hover:underline" to={`/projects/${selectedProjectId}/papers/${paper.id}`}>{paper.title}</Link></div>
                         <div className="text-xs text-muted-foreground mt-1 flex items-center gap-2">
-                          <span>{paper.year || "2023"}</span>
+                          <span>{paper.year || "Unknown"}</span>
                           <span>·</span>
-                          <span className="truncate max-w-[150px]">{paper.venue || "arXiv"}</span>
+                          <span className="truncate max-w-[150px]">{paper.venue || "Unknown venue"}</span>
                           {paper.doi && (
                             <a
                               href={`https://doi.org/${paper.doi}`}
@@ -204,7 +214,7 @@ export default function LiteraturePage() {
                     {paper.title}
                   </CardTitle>
                   <Badge variant="outline" className="text-xs shrink-0">
-                    {paper.year || "2023"}
+                    {paper.year || "Unknown"}
                   </Badge>
                 </div>
                 <CardDescription className="text-xs">

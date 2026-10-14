@@ -55,15 +55,24 @@ class WorkflowRunner:
             ctx.stage_outputs.update(stage_data)
 
         await self._job_repo.mark_started(job_id)
+        await self._db.commit()
 
         current_stage: Optional[JobStage] = start_stage
 
         while current_stage is not None and current_stage != JobStage.COMPLETED:
+            await self._db.refresh(await self._job_repo.get_or_raise(job_id))
+            job = await self._job_repo.get_or_raise(job_id)
+            if job.status == JobStatus.CANCELLED:
+                ctx.status = JobStatus.CANCELLED
+                return ctx
+            await self._job_repo.update(job_id, stage=current_stage)
+            await self._db.commit()
             handler = STAGE_HANDLERS.get(current_stage)
             if handler is None:
                 error = f"No handler registered for stage: {current_stage.value}"
                 ctx.fail(error)
                 await self._job_repo.mark_failed(job_id, error)
+                await self._db.commit()
                 raise WorkflowError(error)
 
             stage_succeeded = False
@@ -85,6 +94,11 @@ class WorkflowRunner:
                     )
 
                     ctx.record_stage_output(current_stage, output)
+                    from dataclasses import asdict
+                    job = await self._job_repo.get_or_raise(job_id)
+                    metadata = dict(job.job_metadata or {})
+                    metadata.setdefault("stage_outputs", {})[current_stage.value] = asdict(output)
+                    await self._job_repo.update(job_id, job_metadata=metadata)
                     await self._persist_progress(job_id, current_stage)
 
                     logger.info(
@@ -116,6 +130,7 @@ class WorkflowRunner:
                         error=str(exc),
                     )
 
+                await self._db.rollback()
                 if attempt < settings.JOB_MAX_RETRIES:
                     # Exponential backoff: 2s, 4s, 8s
                     await asyncio.sleep(2 ** (attempt + 1))
@@ -124,6 +139,7 @@ class WorkflowRunner:
                 error_msg = str(last_error) if last_error else "Unknown error"
                 ctx.fail(error_msg)
                 await self._job_repo.mark_failed(job_id, error_msg)
+                await self._db.commit()
                 raise WorkflowError(
                     f"Stage {current_stage.value} failed after {settings.JOB_MAX_RETRIES} retries: {error_msg}"
                 ) from last_error
@@ -131,7 +147,9 @@ class WorkflowRunner:
             current_stage = next_stage(current_stage)
 
         ctx.complete()
+        await self._job_repo.update(job_id, stage=JobStage.COMPLETED)
         await self._job_repo.mark_completed(job_id)
+        await self._db.commit()
         logger.info("workflow.complete", job_id=str(job_id), project_id=str(project_id))
         return ctx
 

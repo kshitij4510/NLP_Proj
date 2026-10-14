@@ -77,7 +77,7 @@ class Settings(BaseSettings):
     OPENAI_BASE_URL: str = "https://api.openai.com/v1"
 
     GEMINI_API_KEY: Optional[str] = None
-    GEMINI_MODEL: str = "gemini-1.5-flash"
+    GEMINI_MODEL: str = "gemini-3.8-flash"
 
     # ── External Academic APIs ─────────────────
     SEMANTIC_SCHOLAR_API_KEY: Optional[str] = None

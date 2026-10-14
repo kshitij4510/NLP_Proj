@@ -4,13 +4,14 @@ Passwords are hashed via bcrypt; tokens are JWT.
 """
 from __future__ import annotations
 
+import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.exceptions import AuthenticationError, ConflictError
 from app.core.logging import get_logger
 from app.core.security import (
-    create_access_token, create_refresh_token,
+    decode_token, create_access_token, create_refresh_token,
     get_subject_from_token, hash_password, verify_password,
 )
 from app.models.user import User
@@ -58,10 +59,22 @@ class AuthService:
         )
 
     async def refresh(self, refresh_token: str) -> TokenResponse:
+        from jose import JWTError
+        try:
+            if decode_token(refresh_token).get("type") != "refresh":
+                raise AuthenticationError("Invalid refresh token")
+        except JWTError:
+            raise AuthenticationError("Invalid refresh token")
         subject = get_subject_from_token(refresh_token)
         if subject is None:
             raise AuthenticationError("Invalid refresh token")
-        user = await self._users.get_or_raise(subject)
+        try:
+            user_id = uuid.UUID(subject)
+        except (ValueError, TypeError):
+            raise AuthenticationError("Invalid refresh token")
+        user = await self._users.get(user_id)
+        if user is None:
+            raise AuthenticationError("Invalid refresh token")
         if not user.is_active:
             raise AuthenticationError("Account is deactivated")
 

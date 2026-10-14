@@ -4,9 +4,9 @@ from __future__ import annotations
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, Query, status
+from fastapi import Depends, APIRouter, Query, status, HTTPException
 
-from app.api.deps import CurrentUser, DB
+from app.api.deps import CurrentUser, DB, require_project_access
 from app.models.research import GapType, HypothesisStatus
 from app.schemas.common import PaginatedResponse, SuccessResponse
 from app.schemas.research import (
@@ -20,7 +20,7 @@ from app.services.research_service import ResearchService
 from app.services.temporal_service import TemporalService
 from app.models.job import JobStage
 
-router = APIRouter(prefix="/projects/{project_id}/research", tags=["research"])
+router = APIRouter(prefix="/projects/{project_id}/research", tags=["research"], dependencies=[Depends(require_project_access)])
 
 
 # ── Research Plan (Spec Module B) ─────────────────────────────────────────────
@@ -66,7 +66,7 @@ async def trigger_pipeline(
     project_id: uuid.UUID,
     user: CurrentUser,
     db: DB,
-    stage: Optional[str] = Query(default="PLANNING"),
+    stage: JobStage = Query(default=JobStage.PLANNING),
 ):
     """
     Trigger the full research pipeline as a background job.
@@ -74,13 +74,19 @@ async def trigger_pipeline(
     """
     from app.workers.dispatcher import enqueue_full_pipeline
 
+    from app.services.project_service import ProjectService
+    await ProjectService(db).get(project_id, user.id)
     job_svc = JobService(db)
+    active = await job_svc.get_active(project_id)
+    if active:
+        return {"job_id": str(active.id), "status": active.status.value}
     job = await job_svc.create(
         project_id=project_id,
-        stage=JobStage[stage],
+        stage=stage,
         metadata={"triggered_by": str(user.id)},
     )
-    arq_job_id = await enqueue_full_pipeline(project_id, job.id, JobStage[stage])
+    await db.commit()
+    arq_job_id = await enqueue_full_pipeline(project_id, job.id, stage)
     return {"job_id": str(job.id), "arq_job_id": arq_job_id, "status": "queued"}
 
 
@@ -89,12 +95,18 @@ async def synthesize(project_id: uuid.UUID, user: CurrentUser, db: DB):
     """Trigger synthesis pipeline (retrieval → synthesis → gaps → hypotheses)."""
     from app.workers.dispatcher import enqueue_synthesis
 
+    from app.services.project_service import ProjectService
+    await ProjectService(db).get(project_id, user.id)
     job_svc = JobService(db)
+    active = await job_svc.get_active(project_id)
+    if active:
+        return {"job_id": str(active.id), "status": active.status.value}
     job = await job_svc.create(
         project_id=project_id,
         stage=JobStage.SYNTHESIS,
         metadata={"triggered_by": str(user.id)},
     )
+    await db.commit()
     await enqueue_synthesis(project_id, job.id)
     return {"job_id": str(job.id), "status": "queued"}
 

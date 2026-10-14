@@ -4,15 +4,15 @@ from __future__ import annotations
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, Query
+from fastapi import HTTPException, Depends, APIRouter, Query
 
-from app.api.deps import CurrentUser, DB
+from app.api.deps import CurrentUser, DB, require_project_access
 from app.models.job import JobStage, JobStatus
 from app.schemas.common import PaginatedResponse, SuccessResponse
 from app.schemas.job import JobRead
 from app.services.job_service import JobService
 
-router = APIRouter(prefix="/projects/{project_id}/jobs", tags=["jobs"])
+router = APIRouter(prefix="/projects/{project_id}/jobs", tags=["jobs"], dependencies=[Depends(require_project_access)])
 
 
 @router.get("", response_model=PaginatedResponse[JobRead])
@@ -47,11 +47,17 @@ async def get_active_job(project_id: uuid.UUID, user: CurrentUser, db: DB):
 @router.get("/{job_id}", response_model=JobRead)
 async def get_job(project_id: uuid.UUID, job_id: uuid.UUID, user: CurrentUser, db: DB):
     svc = JobService(db)
+    job = await svc.get(job_id)
+    if job.project_id != project_id:
+        raise HTTPException(404, "Job not found")
     return await svc.get(job_id)
 
 
 @router.post("/{job_id}/cancel", response_model=SuccessResponse)
 async def cancel_job(project_id: uuid.UUID, job_id: uuid.UUID, user: CurrentUser, db: DB):
     svc = JobService(db)
+    job = await svc.get(job_id)
+    if job.project_id != project_id:
+        raise HTTPException(404, "Job not found")
     await svc.cancel(job_id)
     return SuccessResponse(message="Job cancelled")

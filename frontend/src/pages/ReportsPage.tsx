@@ -1,3 +1,5 @@
+import ManuscriptStudio from "@/components/ManuscriptStudio";
+import { useSearchParams } from "react-router-dom";
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useProjects } from "@/hooks/useProjects";
@@ -7,11 +9,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { FileText, Loader2, AlertTriangle } from "lucide-react";
 import { formatDate } from "@/lib/utils";
+import { errorMessage } from "@/lib/errors";
 import type { Report } from "@/types";
 
 export default function ReportsPage() {
   const { data: projects } = useProjects({ page_size: 50 });
-  const [selectedProject, setSelectedProject] = useState("");
+  const [selectedProject, setSelectedProject] = useState(useSearchParams()[0].get("project") || "");
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
 
   const { data: reports, refetch } = useQuery({
@@ -22,16 +25,20 @@ export default function ReportsPage() {
 
   const generate = useMutation({
     mutationFn: () => reportsApi.generate(selectedProject, { verify_claims: true }),
-    onSuccess: () => refetch(),
+    onSuccess: (report) => { setSelectedReport(report); refetch(); },
+  });
+
+  const download = useMutation({
+    mutationFn: (format: "ieee" | "markdown" | "bibtex") => reportsApi.download(selectedProject, selectedReport!.id, format),
   });
 
   return (
     <div className="p-8 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Research Reports</h1>
+          <h1 className="text-2xl font-bold">Manuscripts</h1>
           <p className="text-muted-foreground mt-1">
-            Reports are generated from verified artifacts. Claim verification runs before finalization.
+            Generate a manuscript from the project corpus, hypotheses, and recorded results. Drafts expose verification limitations.
           </p>
         </div>
       </div>
@@ -52,10 +59,18 @@ export default function ReportsPage() {
           disabled={!selectedProject || generate.isPending}
         >
           {generate.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
-          Generate Report
+          Create corpus review
         </Button>
       </div>
 
+      <ManuscriptStudio key={selectedProject} projectId={selectedProject} onReport={(report)=>{setSelectedReport(report);refetch();}} />
+      {(generate.error || download.error) && <p role="alert" className="text-destructive">{errorMessage(generate.error || download.error)}</p>}
+      {selectedReport && <div className="flex gap-2 flex-wrap">
+        <Button disabled={download.isPending} onClick={() => download.mutate("ieee")}>Download IEEE Paper (.tex)</Button>
+        <Button variant="outline" disabled={download.isPending} onClick={() => download.mutate("markdown")}>Markdown</Button>
+        <Button variant="outline" disabled={download.isPending} onClick={() => download.mutate("bibtex")}>BibTeX</Button>
+        <p className="text-sm text-muted-foreground w-full">Compile the IEEE source in Overleaf or with IEEEtran installed. Replace author details and review the draft before submission.</p>
+      </div>}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Report list */}
         <div className="space-y-3">
@@ -98,6 +113,8 @@ export default function ReportsPage() {
               ["Literature Review", selectedReport.literature_review],
               ["Research Gaps", selectedReport.research_gaps_section],
               ["Hypotheses", selectedReport.hypotheses_section],
+              ["Experimental Design", selectedReport.experimental_design],
+              ["Results", selectedReport.results],
               ["Limitations", selectedReport.limitations],
               ["Conclusion", selectedReport.conclusion],
             ].map(([section, content]) =>
@@ -115,11 +132,11 @@ export default function ReportsPage() {
             {selectedReport.citations.length > 0 && (
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm">References ({selectedReport.citations.length})</CardTitle>
+                  <CardTitle className="text-sm">References ({selectedReport.citations.filter((c) => c.style === "ieee").length})</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
-                    {selectedReport.citations.filter((c) => c.style === "apa").map((c) => (
+                    {selectedReport.citations.filter((c) => c.style === "ieee").map((c) => (
                       <p key={c.id} className="text-xs text-muted-foreground">{c.formatted_citation}</p>
                     ))}
                   </div>

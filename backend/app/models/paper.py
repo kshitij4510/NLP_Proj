@@ -8,7 +8,7 @@ import uuid
 from typing import List, Optional
 
 from sqlalchemy import (
-    ForeignKey, Integer, String, Text, Float,
+    ForeignKey, Integer, String, Text, Float, JSON,
     Enum as SAEnum, UniqueConstraint,
 )
 from app.models.compat import UUID, JSONB
@@ -21,9 +21,9 @@ from app.models.base import Base, TimestampMixin, UUIDMixin
 # Use pgvector when available (PostgreSQL), fall back to Text for SQLite
 try:
     from pgvector.sqlalchemy import Vector as _Vector
-    _EMBEDDING_COLUMN_TYPE = _Vector(settings.EMBEDDING_DIMENSION)
+    _EMBEDDING_COLUMN_TYPE = JSON() if settings.DATABASE_URL.startswith("sqlite") else _Vector(settings.EMBEDDING_DIMENSION)
 except Exception:
-    _EMBEDDING_COLUMN_TYPE = Text()
+    _EMBEDDING_COLUMN_TYPE = JSON()
 
 
 class PaperStatus(str, enum.Enum):

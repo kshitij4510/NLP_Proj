@@ -49,6 +49,12 @@ class HypothesisService:
         from app.services.llm_service import LLMService
 
         gap = await self._gaps.get_or_raise(gap_id)
+        if gap.project_id != project_id:
+            from app.core.exceptions import NotFoundError
+            raise NotFoundError("Gap not found in project")
+        existing, _ = await self._hypotheses.list_by_project(project_id, limit=500)
+        if any(h.gap_id == gap_id for h in existing):
+            return []
         evidence = "\n".join(gap.evidence_snippets or [])
         prompt = HYPOTHESIS_PROMPT.format(
             gap_title=gap.title,
@@ -58,7 +64,12 @@ class HypothesisService:
         )
 
         llm = LLMService()
-        raw = await llm.generate_json_list(prompt)
+        from app.core.config import settings
+        if settings.LLM_PROVIDER == "demo":
+            raw = [{"statement": "We hypothesize that reranking retrieved evidence will improve Recall@10 over a BM25-only baseline when investigating: " + gap.title,
+                "rationale": "Proposed retrieval hypothesis motivated by the source limitation. Test on manually annotated relevant passages; reject if paired evaluation shows no improvement.", "testability_score": 0.7}]
+        else:
+            raw = await llm.generate_json_list(prompt)
 
         created: List[Hypothesis] = []
         for h in raw:

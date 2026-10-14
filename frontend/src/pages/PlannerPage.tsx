@@ -1,3 +1,5 @@
+import { useNavigate } from "react-router-dom";
+import { errorMessage } from "@/lib/errors";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useProjects } from "@/hooks/useProjects";
@@ -14,6 +16,7 @@ import type { ResearchPlan } from "@/types";
 
 export default function PlannerPage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { data: projects } = useProjects({ page_size: 50 });
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
   const [editedPlan, setEditedPlan] = useState<ResearchPlan | null>(null);
@@ -57,7 +60,8 @@ export default function PlannerPage() {
   const runPipelineMutation = useMutation({
     mutationFn: () => researchApi.triggerPipeline(selectedProjectId, "DISCOVERY"),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["active-job", selectedProjectId] });
+      queryClient.invalidateQueries({ queryKey: ["jobs", selectedProjectId] });
+      navigate(`/projects/${selectedProjectId}`);
     },
   });
 
@@ -72,11 +76,12 @@ export default function PlannerPage() {
 
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-6">
+      {(generateMutation.error || updateMutation.error || runPipelineMutation.error) && <p role="alert" className="text-destructive">{errorMessage(generateMutation.error || updateMutation.error || runPipelineMutation.error)}</p>}
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b pb-6">
         <div>
           <div className="flex items-center gap-2 text-primary font-semibold text-sm mb-1 uppercase tracking-wider">
-            <Compass className="h-4 w-4" /> Autonomous Research Planner (Module B)
+            <Compass className="h-4 w-4" /> Structured Autonomous Research Investigation Planner
           </div>
           <h1 className="text-3xl font-bold tracking-tight">Research Plan Formulation</h1>
           <p className="text-muted-foreground text-sm mt-1">

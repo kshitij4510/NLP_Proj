@@ -1,3 +1,4 @@
+import { errorMessage } from "@/lib/errors";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { experimentsApi, hypothesesApi } from "@/api/endpoints";
@@ -119,6 +120,7 @@ export default function ExperimentsPage() {
 
   return (
     <div className="p-8 space-y-6">
+      {(createMutation.error || designMutation.error || recordRunMutation.error) && <p role="alert" className="text-destructive">{errorMessage(createMutation.error || designMutation.error || recordRunMutation.error)}</p>}
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b pb-6">
         <div>

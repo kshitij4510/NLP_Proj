@@ -1,3 +1,4 @@
+import { errorMessage } from "@/lib/errors";
 import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -16,6 +17,7 @@ export default function PaperViewerPage() {
   const { projectId, paperId } = useParams<{ projectId: string; paperId: string }>();
   const [qaQuery, setQaQuery] = useState("");
   const [qaResults, setQaResults] = useState<EvidenceSnippet[] | null>(null);
+  const [qaError, setQaError] = useState<string | null>(null);
   const [isSearching, setIsSearching] = useState(false);
 
   const { data: paper, isLoading: paperLoading } = useQuery({
@@ -40,16 +42,18 @@ export default function PaperViewerPage() {
     e.preventDefault();
     if (!qaQuery.trim() || !projectId) return;
     setIsSearching(true);
+    setQaError(null);
     try {
       const res = await retrievalApi.search({
         query: qaQuery,
         project_id: projectId,
         top_k: 5,
         use_reranking: true,
+        metadata_filters: { paper_id: paperId! },
       });
       setQaResults(res.evidence);
     } catch (err) {
-      console.error(err);
+      setQaError(errorMessage(err));
     } finally {
       setIsSearching(false);
     }
@@ -203,7 +207,7 @@ export default function PaperViewerPage() {
             <CardHeader className="pb-3">
               <CardTitle className="text-sm flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4 text-emerald-500" />
-                Ground-Truth Claims
+                Stored Claims
               </CardTitle>
               <CardDescription className="text-xs">
                 Extracted claims verified against verbatim paper chunks.
@@ -213,10 +217,10 @@ export default function PaperViewerPage() {
               {!claims?.items?.length ? (
                 <p className="text-xs text-muted-foreground">No claims extracted yet.</p>
               ) : (
-                claims.items.slice(0, 4).map((c) => (
+                claims.items.filter((c) => c.paper_id === paperId).slice(0, 4).map((c) => (
                   <div key={c.id} className="p-2.5 rounded-lg border bg-muted/10 space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <Badge variant="success" className="text-[10px]">
+                      <Badge variant={c.verification_status === "SUPPORTED" ? "success" : "secondary"} className="text-[10px]">
                         {c.verification_status}
                       </Badge>
                       <span className="text-[10px] text-muted-foreground font-mono">
@@ -259,6 +263,7 @@ export default function PaperViewerPage() {
                 </Button>
               </form>
 
+              {qaError && <p role="alert" className="text-destructive text-sm">{qaError}</p>}
               {/* Q&A Evidence Results */}
               <div className="space-y-3 mt-4">
                 {qaResults === null ? (

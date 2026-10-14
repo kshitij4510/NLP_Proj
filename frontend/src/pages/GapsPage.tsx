@@ -1,3 +1,4 @@
+import { errorMessage } from "@/lib/errors";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
@@ -38,7 +39,7 @@ export default function GapsPage() {
     mutationFn: (gapId: string) => hypothesesApi.generateForGap(selectedProjectId, gapId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["hypotheses", selectedProjectId] });
-      navigate("/hypotheses");
+      navigate(`/hypotheses?project=${selectedProjectId}`);
     },
   });
 
@@ -46,11 +47,12 @@ export default function GapsPage() {
 
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-6">
+      {(generateHypMutation.error) && <p role="alert" className="text-destructive">{errorMessage(generateHypMutation.error)}</p>}
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b pb-6">
         <div>
           <div className="flex items-center gap-2 text-primary font-semibold text-sm mb-1 uppercase tracking-wider">
-            <Lightbulb className="h-4 w-4" /> Research Gap Detection (Module I & §28)
+            <Lightbulb className="h-4 w-4" /> Empirical Research Gap Detection
           </div>
           <h1 className="text-3xl font-bold tracking-tight">Research Gap Explorer</h1>
           <p className="text-muted-foreground text-sm mt-1">

@@ -33,6 +33,7 @@ class BM25Retriever:
         top_k: int = 20,
         year_min: Optional[int] = None,
         year_max: Optional[int] = None,
+        paper_id: Optional[str] = None,
     ) -> List[Tuple[uuid.UUID, float]]:
         """
         Returns list of (chunk_id, bm25_score) sorted descending.
@@ -49,6 +50,8 @@ class BM25Retriever:
             .join(Paper, PaperChunk.paper_id == Paper.id)
             .where(Paper.project_id == project_id)
         )
+        if paper_id:
+            stmt = stmt.where(Paper.id == uuid.UUID(str(paper_id)))
         if year_min:
             stmt = stmt.where(Paper.year >= year_min)
         if year_max:
@@ -64,11 +67,12 @@ class BM25Retriever:
         corpus = [row[1] for row in rows]
 
         # Build BM25 index
-        tokenized = [doc.lower().split() for doc in corpus]
+        import re
+        tokenized = [re.findall(r"[a-z0-9]+", doc.lower()) for doc in corpus]
         bm25 = BM25Okapi(tokenized, k1=_BM25_K1, b=_BM25_B)
 
         # Score query
-        query_tokens = query.lower().split()
+        query_tokens = re.findall(r"[a-z0-9]+", query.lower())
         scores = bm25.get_scores(query_tokens)
 
         # Pair with chunk IDs and sort

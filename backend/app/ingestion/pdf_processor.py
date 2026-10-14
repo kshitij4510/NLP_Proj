@@ -134,6 +134,7 @@ def _extract_with_pymupdf(path: str) -> PDFDocument:
                 page_end=len(doc) - 1,
             ))
 
+    page_count = len(doc)
     doc.close()
 
     # Extract title from first section if not in metadata
@@ -144,7 +145,7 @@ def _extract_with_pymupdf(path: str) -> PDFDocument:
         title=title,
         abstract=abstract,
         sections=sections,
-        page_count=len(doc) if hasattr(doc, '__len__') else 0,
+        page_count=page_count,
         metadata={"source": "pymupdf"},
     )
 

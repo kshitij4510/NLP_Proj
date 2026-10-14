@@ -37,7 +37,7 @@ class EmbeddingEngine:
         return cls._instance
 
     def _load_model(self) -> None:
-        if self._model is not None:
+        if self._model is not None or self._model_name == "lexical-hash":
             return
         try:
             from sentence_transformers import SentenceTransformer
@@ -45,8 +45,8 @@ class EmbeddingEngine:
             self._model = SentenceTransformer(self._model_name)
             logger.info("embeddings.model_loaded", model=self._model_name)
         except Exception as exc:
-            logger.error("embeddings.load_failed", error=str(exc))
-            raise
+            logger.warning("embeddings.load_failed_falling_back", error=str(exc))
+            self._model = None
 
     def encode_sync(
         self,
@@ -58,6 +58,21 @@ class EmbeddingEngine:
         self._load_model()
         if not texts:
             return []
+
+        if self._model is None:
+            # Deterministic fallback pseudo-embeddings for demo / offline environments
+            import hashlib
+            import math
+            import re
+            results: List[List[float]] = []
+            for t in texts:
+                vec = [0.0] * self._dimension
+                for token in re.findall(r"[a-z0-9]+", t.lower()):
+                    digest = hashlib.sha256(token.encode("utf-8")).digest()
+                    vec[int.from_bytes(digest[:4], "big") % self._dimension] += 1.0
+                norm = math.sqrt(sum(x * x for x in vec)) or 1.0
+                results.append([float(x / norm) for x in vec])
+            return results
 
         # BGE models benefit from an instruction prefix for retrieval
         if "bge" in self._model_name.lower():

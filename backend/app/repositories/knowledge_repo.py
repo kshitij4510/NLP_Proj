@@ -159,7 +159,7 @@ class ClaimRepository(BaseRepository[Claim]):
             select(func.count()).select_from(Claim).where(
                 and_(
                     Claim.project_id == project_id,
-                    Claim.verification_status == VerificationStatus.INSUFFICIENT_EVIDENCE,
+                    Claim.verification_status != VerificationStatus.SUPPORTED,
                 )
             )
         )

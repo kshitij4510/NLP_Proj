@@ -35,13 +35,13 @@ class CitationService:
         All citation data comes from stored metadata — never from an LLM.
         """
         created: List[Citation] = []
-        for paper_id in paper_ids:
+        for number, paper_id in enumerate(paper_ids, 1):
             paper = await self._papers.get_with_authors(paper_id)
             if not paper:
                 continue
             for style in styles:
                 formatted = self._format(paper, style)
-                in_text = self._in_text(paper, style)
+                in_text = f"[{number}]" if style == CitationStyle.IEEE else self._in_text(paper, style)
                 citation = await self._citations.create(
                     report_id=report_id,
                     paper_id=paper_id,
@@ -93,41 +93,29 @@ class CitationService:
             return f'{author_str}, "{title}," {venue}, {year}.'
 
         if style == CitationStyle.BIBTEX:
-            key = CitationService._bibtex_key(authors, year)
-            author_str = " and ".join(authors)
-            doi_field = f"  doi = {{{doi}}},\n" if doi else ""
-            return (
-                f"@article{{{key},\n"
-                f"  title = {{{title}}},\n"
-                f"  author = {{{author_str}}},\n"
-                f"  year = {{{year}}},\n"
-                f"  journal = {{{venue}}},\n"
-                f"{doi_field}"
-                f"}}"
-            )
+            return CitationService.format_bibtex({"authors": authors, "title": title, "year": paper.year, "venue": venue, "doi": doi, "arxiv_id": paper.arxiv_id})
 
         return f"{authors[0]} et al. ({year}). {title}."
 
     @staticmethod
     def format_bibtex(meta: dict) -> str:
         """Format a BibTeX citation entry from a metadata dictionary."""
-        authors = meta.get("authors") or ["Unknown"]
-        year = meta.get("year") or "n.d."
+        import re, hashlib
+        def escape(value):
+            return str(value).replace("\\", r"\textbackslash{}").replace("{", r"\{").replace("}", r"\}").replace("%", r"\%").replace("&", r"\&").replace("_", r"\_").replace("#", r"\#")
+        authors = meta.get("authors") or []
+        if isinstance(authors, str): authors = [authors]
         title = meta.get("title") or "Untitled"
+        key = re.sub(r"[^A-Za-z0-9]", "", CitationService._bibtex_key(authors, meta.get("year") or "nd")) + "_" + hashlib.sha256(title.encode()).hexdigest()[:8]
         venue = meta.get("venue") or ""
-        doi = meta.get("doi") or ""
-        key = CitationService._bibtex_key(authors, year)
-        author_str = " and ".join(authors) if isinstance(authors, list) else str(authors)
-        doi_field = f"  doi = {{{doi}}},\n" if doi else ""
-        return (
-            f"@article{{{key},\n"
-            f"  title = {{{title}}},\n"
-            f"  author = {{{author_str}}},\n"
-            f"  year = {{{year}}},\n"
-            f"  journal = {{{venue}}},\n"
-            f"{doi_field}"
-            f"}}"
-        )
+        conference = any(word in venue.lower() for word in ("proceedings", "conference", "acl", "emnlp", "iclr", "neurips"))
+        fields = [("title", title)]
+        if authors: fields.append(("author", " and ".join(authors)))
+        if meta.get("year"): fields.append(("year", meta["year"]))
+        if venue: fields.append(("booktitle" if conference else "journal", venue))
+        if meta.get("doi"): fields.append(("doi", meta["doi"]))
+        if meta.get("arxiv_id"): fields += [("eprint", meta["arxiv_id"]), ("archivePrefix", "arXiv")]
+        return "@" + ("inproceedings" if conference else "misc" if not venue else "article") + "{" + key + ",\n" + ",\n".join("  " + name + " = {" + escape(value) + "}" for name, value in fields) + "\n}"
 
     @staticmethod
     def _in_text(paper: Paper, style: CitationStyle) -> str:

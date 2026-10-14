@@ -1,0 +1,8 @@
+# Configuration-only check using public example values, never deploy this fixture.
+services:
+  backend:
+    env_file: !override [.env.example]
+  worker:
+    env_file: !override [.env.example]
+  frontend:
+    env_file: !override [.env.example]

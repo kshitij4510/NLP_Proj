@@ -1,0 +1,13 @@
+{
+  "routes": true,
+  "pdf_ingestion": true,
+  "hybrid_retrieval": true,
+  "arq_pipeline": "completed",
+  "reports": 2,
+  "exports": [
+    "ieee",
+    "markdown",
+    "bibtex"
+  ],
+  "fixture_project": "8f08a43a-6953-4c05-941f-975bb0283e83"
+}

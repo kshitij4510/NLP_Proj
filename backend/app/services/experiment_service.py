@@ -40,6 +40,7 @@ Output JSON matching the experiment schema.
 
 class ExperimentService:
     def __init__(self, db: AsyncSession) -> None:
+        self._db = db
         self._experiments = ExperimentRepository(db)
         self._runs = ExperimentRunRepository(db)
         self._metrics = MetricRepository(db)
@@ -53,6 +54,12 @@ class ExperimentService:
 
         hyp_repo = HypothesisRepository(self._db)
         hyp = await hyp_repo.get_or_raise(hypothesis_id)
+        if hyp.project_id != project_id:
+            from app.core.exceptions import NotFoundError
+            raise NotFoundError("Hypothesis not found in project")
+        existing = await self._experiments.first(project_id=project_id, hypothesis_id=hypothesis_id)
+        if existing:
+            return existing
 
         gap_type = "unknown"
         if hyp.gap_id:
@@ -66,7 +73,16 @@ class ExperimentService:
             hypothesis=hyp.statement, gap_type=gap_type
         )
         llm = LLMService()
-        raw = await llm.generate_json(prompt)
+        from app.core.config import settings
+        if settings.LLM_PROVIDER == "demo":
+            raw = {"model": {"architecture": "Hybrid BM25 + vector retrieval; optional reranking"},
+                "baseline": {"architecture": "BM25-only retrieval"},
+                "metrics": ["Recall@10", "nDCG@10", "MRR"],
+                "hyperparameters": {"top_k": 10, "dense_weight": 0.5, "annotation_required": True},
+                "statistical_tests": ["Paired bootstrap over independently annotated queries"],
+                "ablations": [{"name": "without_dense"}, {"name": "without_reranking"}]}
+        else:
+            raw = await llm.generate_json(prompt)
 
         exp = await self._experiments.create(
             project_id=project_id,
@@ -131,6 +147,7 @@ class ExperimentService:
             hardware_info=hardware_info,
             logs=logs,
         )
+        await self._experiments.update(experiment_id, status=ExperimentStatus.COMPLETED)
         # Persist individual metric records for querying
         for name, value in metrics.items():
             if isinstance(value, (int, float)):

@@ -31,7 +31,8 @@ class CrossEncoderReranker:
         return cls._instance
 
     def _load(self) -> None:
-        if self._model is not None:
+        from app.core.config import settings
+        if settings.EMBEDDING_MODEL == "lexical-hash" or self._model is not None:
             return
         try:
             from sentence_transformers import CrossEncoder

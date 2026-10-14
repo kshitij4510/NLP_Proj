@@ -13,5 +13,7 @@ async def search(query: RetrievalQuery, user: CurrentUser, db: DB):
     Hybrid BM25 + dense retrieval with optional reranking.
     Returns evidence snippets with full provenance (paper, page, section, scores).
     """
+    from app.services.project_service import ProjectService
+    await ProjectService(db).get(query.project_id, user.id)
     svc = RetrievalService(db)
     return await svc.retrieve(query)

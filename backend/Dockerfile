@@ -24,10 +24,15 @@ WORKDIR /app
 
 # Install Python dependencies
 COPY requirements.txt .
+ARG TORCH_INDEX_URL=https://download.pytorch.org/whl/cpu
+RUN pip install --no-cache-dir torch==2.3.0 --index-url ${TORCH_INDEX_URL}
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Download spaCy model
 RUN python -m spacy download en_core_web_sm
+
+# passlib 1.7.4 requires the legacy bcrypt backend behavior.
+RUN pip install --no-cache-dir bcrypt==4.0.1
 
 # ─────────────────────────────────────────────
 # Development stage
@@ -52,7 +57,7 @@ COPY . .
 
 # Create non-root user
 RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
-RUN chown -R appuser:appgroup /app
+RUN mkdir -p /app/uploads /app/models_cache && chown -R appuser:appgroup /app
 USER appuser
 
 EXPOSE 8000

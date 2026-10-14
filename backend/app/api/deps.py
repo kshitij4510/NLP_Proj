@@ -32,13 +32,14 @@ async def get_current_user(
     try:
         payload = decode_token(credentials.credentials)
         user_id: str = payload.get("sub")
-        if user_id is None:
+        if user_id is None or payload.get("type") != "access":
             raise credentials_exception
-    except JWTError:
+        parsed_user_id = uuid.UUID(user_id)
+    except (JWTError, ValueError, TypeError):
         raise credentials_exception
 
     user_repo = UserRepository(db)
-    user = await user_repo.get(uuid.UUID(user_id))
+    user = await user_repo.get(parsed_user_id)
     if user is None or not user.is_active:
         raise credentials_exception
     return user
@@ -47,3 +48,8 @@ async def get_current_user(
 # Convenience type aliases
 CurrentUser = Annotated[User, Depends(get_current_user)]
 DB = Annotated[AsyncSession, Depends(get_db)]
+
+
+async def require_project_access(project_id: uuid.UUID, user: CurrentUser, db: DB):
+    from app.services.project_service import ProjectService
+    return await ProjectService(db).get(project_id, user.id)

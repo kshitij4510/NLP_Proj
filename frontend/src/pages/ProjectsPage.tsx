@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useProjects, useCreateProject, useDeleteProject } from "@/hooks/useProjects";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,7 @@ export default function ProjectsPage() {
   const { data, isLoading } = useProjects({ page_size: 50 });
   const createProject = useCreateProject();
   const deleteProject = useDeleteProject();
-  const [showForm, setShowForm] = useState(false);
+  const [showForm, setShowForm] = useState(useLocation().pathname === "/projects/new");
   const [title, setTitle] = useState("");
   const [question, setQuestion] = useState("");
 

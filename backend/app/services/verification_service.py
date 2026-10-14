@@ -59,8 +59,15 @@ class VerificationService:
             claim=claim.claim_text, evidence=evidence_text
         )
 
-        llm = LLMService()
-        result = await llm.generate_json(prompt)
+        from app.core.config import settings
+        if settings.LLM_PROVIDER == "demo":
+            exact = any(claim.claim_text in snippet.get("content", "") for snippet in evidence_snippets)
+            result = {"status": "SUPPORTED" if exact else "INSUFFICIENT_EVIDENCE",
+                "confidence": 1.0 if exact else 0.0,
+                "reasoning": "Verbatim occurrence in a stored source; not independent validation." if exact else "No verbatim source match; model verification unavailable."}
+        else:
+            llm = LLMService()
+            result = await llm.generate_json(prompt)
 
         status = self._parse_status(result.get("status", "INSUFFICIENT_EVIDENCE"))
         confidence = float(result.get("confidence", 0.0))
@@ -91,7 +98,7 @@ class VerificationService:
         Verify all pending claims in a project.
         Returns summary counts per verification status.
         """
-        claims, _ = await self._claims.list_by_project(project_id)
+        claims, _ = await self._claims.list_by_project(project_id, limit=10000)
         summary: Dict[str, int] = {s.value: 0 for s in VerificationStatus}
 
         for claim in claims:

@@ -70,6 +70,8 @@ class PaperService:
             if existing is None and r.arxiv_id:
                 existing = await self._papers.get_by_arxiv_id(project_id, r.arxiv_id)
 
+            if existing is None:
+                existing = await self._papers.first(project_id=project_id, title=r.title)
             if existing:
                 skipped += 1
                 continue

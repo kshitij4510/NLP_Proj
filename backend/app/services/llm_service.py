@@ -40,7 +40,7 @@ class LLMService:
                 return await self._openai_text(prompt, max_tokens)
             if self._provider == "gemini":
                 return await self._gemini_text(prompt, max_tokens)
-            return _DEMO_TEXT
+            raise LLMError(f"Unsupported LLM provider: {self._provider}. Choose demo, openai, or gemini.")
         except Exception as exc:
             logger.error("llm.generate_text.error", provider=self._provider, error=str(exc))
             raise LLMError(f"LLM text generation failed: {exc}") from exc
@@ -50,7 +50,10 @@ class LLMService:
         if self._provider == "demo":
             return _DEMO_JSON.copy()
         raw = await self.generate_text(prompt + "\n\nRespond with valid JSON only.")
-        return self._parse_json(raw) or _DEMO_JSON.copy()
+        parsed = self._parse_json(raw)
+        if not isinstance(parsed, dict):
+            raise LLMError("Provider returned invalid JSON object")
+        return parsed
 
     async def generate_json_list(self, prompt: str) -> List[Dict[str, Any]]:
         """Generate and parse a JSON array."""
@@ -60,11 +63,13 @@ class LLMService:
         parsed = self._parse_json(raw)
         if isinstance(parsed, list):
             return parsed
-        return []
+        raise LLMError("Provider returned invalid JSON array")
 
     # ── Provider implementations ──────────────
 
     async def _openai_text(self, prompt: str, max_tokens: int) -> str:
+        if not settings.OPENAI_API_KEY:
+            raise LLMError("OPENAI_API_KEY is not configured")
         import openai
         client = openai.AsyncOpenAI(
             api_key=settings.OPENAI_API_KEY,
@@ -79,13 +84,24 @@ class LLMService:
         return response.choices[0].message.content or ""
 
     async def _gemini_text(self, prompt: str, max_tokens: int) -> str:
-        import google.generativeai as genai
-        genai.configure(api_key=settings.GEMINI_API_KEY)
-        model = genai.GenerativeModel(settings.GEMINI_MODEL)
-        response = await model.generate_content_async(prompt)
-        return response.text or ""
-
-    # ── Utilities ─────────────────────────────
+        if not settings.GEMINI_API_KEY:
+            raise LLMError("GEMINI_API_KEY is not configured")
+        import httpx
+        async with httpx.AsyncClient(timeout=120) as client:
+            response = await client.post(
+                "https://generativelanguage.googleapis.com/v1beta/interactions",
+                headers={"x-goog-api-key": settings.GEMINI_API_KEY},
+                json={"model": settings.GEMINI_MODEL, "input": prompt, "store": False,
+                      "generation_config": {"max_output_tokens": max_tokens}},
+            )
+            response.raise_for_status()
+            payload = response.json()
+        output = "\n".join(part.get("text", "")
+                           for step in payload.get("steps", []) if step.get("type") == "model_output"
+                           for part in step.get("content", []) if part.get("type") == "text")
+        if not output.strip():
+            raise LLMError("Gemini returned no text output")
+        return output
 
     @staticmethod
     def _parse_json(raw: str) -> Any:

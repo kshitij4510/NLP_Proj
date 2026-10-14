@@ -16,6 +16,7 @@ import HypothesesPage from "@/pages/HypothesesPage";
 import ExperimentsPage from "@/pages/ExperimentsPage";
 import ReportsPage from "@/pages/ReportsPage";
 import SearchPage from "@/pages/SearchPage";
+import AboutPage from "@/pages/AboutPage";
 import SettingsPage from "@/pages/SettingsPage";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -42,6 +43,7 @@ export default function App() {
       >
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/projects" element={<ProjectsPage />} />
+        <Route path="/projects/new" element={<ProjectsPage />} />
         <Route path="/projects/:id" element={<ProjectDetailPage />} />
         <Route path="/projects/:projectId/papers/:paperId" element={<PaperViewerPage />} />
         <Route path="/planner" element={<PlannerPage />} />
@@ -53,6 +55,7 @@ export default function App() {
         <Route path="/experiments" element={<ExperimentsPage />} />
         <Route path="/reports" element={<ReportsPage />} />
         <Route path="/search" element={<SearchPage />} />
+        <Route path="/about" element={<AboutPage />} />
         <Route path="/settings" element={<SettingsPage />} />
 
         {/* Fallback */}

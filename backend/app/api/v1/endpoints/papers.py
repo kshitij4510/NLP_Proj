@@ -4,9 +4,9 @@ from __future__ import annotations
 import uuid
 from typing import List, Optional
 
-from fastapi import APIRouter, Query, UploadFile, File, status
+from fastapi import Depends, APIRouter, Query, UploadFile, File, status
 
-from app.api.deps import CurrentUser, DB
+from app.api.deps import CurrentUser, DB, require_project_access
 from app.core.config import settings
 from app.core.exceptions import FileTypeError, FileSizeError
 from app.models.paper import PaperStatus
@@ -14,7 +14,7 @@ from app.schemas.common import PaginatedResponse, SuccessResponse
 from app.schemas.paper import PaperCreate, PaperRead
 from app.services.paper_service import PaperService
 
-router = APIRouter(prefix="/projects/{project_id}/papers", tags=["papers"])
+router = APIRouter(prefix="/projects/{project_id}/papers", tags=["papers"], dependencies=[Depends(require_project_access)])
 
 
 @router.post("", response_model=PaperRead, status_code=status.HTTP_201_CREATED)
@@ -71,7 +71,7 @@ async def upload_paper(
     # Store local path
     from app.repositories.paper_repo import PaperRepository
     await PaperRepository(db).update(paper.id, local_pdf_path=str(dest))
-    return paper
+    return await PaperRepository(db).get_with_authors(paper.id)
 
 
 @router.get("", response_model=PaginatedResponse[PaperRead])
@@ -103,3 +103,17 @@ async def delete_paper(project_id: uuid.UUID, paper_id: uuid.UUID, user: Current
     svc = PaperService(db)
     await svc.delete(paper_id, user.id)
     return SuccessResponse(message="Paper deleted")
+
+
+from pydantic import BaseModel, Field
+class DiscoveryRequest(BaseModel):
+    query: str = Field(min_length=3, max_length=500)
+
+@router.post("/discover/search", response_model=dict)
+async def discover(project_id: uuid.UUID, data: DiscoveryRequest, user: CurrentUser, db: DB):
+    from app.services.project_service import ProjectService
+    from app.ingestion.ingestion_pipeline import IngestionPipeline
+    await ProjectService(db).get(project_id, user.id)
+    result = await IngestionPipeline(db).run_discovery(project_id, data.query, 60)
+    result["ingestion"] = await IngestionPipeline(db).run_ingestion(project_id, batch_size=200)
+    return result

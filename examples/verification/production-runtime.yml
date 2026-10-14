@@ -1,0 +1,21 @@
+services:
+  postgres:
+    container_name: researchmind_verify_postgres
+    ports: !override ["15432:5432"]
+  redis:
+    container_name: researchmind_verify_redis
+    ports: !override ["16379:6379"]
+  backend:
+    container_name: researchmind_verify_backend
+    env_file: !override [examples/verification/production.env]
+    ports: !override ["18000:8000"]
+  worker:
+    container_name: researchmind_verify_worker
+    env_file: !override [examples/verification/production.env]
+  frontend:
+    container_name: researchmind_verify_frontend
+    env_file: !override [examples/verification/production.env]
+    ports: !override ["18080:80"]
+  nginx:
+    container_name: researchmind_verify_nginx
+    ports: !override ["18081:80"]

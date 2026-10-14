@@ -13,6 +13,11 @@ from pathlib import Path
 # Ensure paths
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+if "DATABASE_URL" not in os.environ:
+    os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///./researchmind_local.db"
+if "DATABASE_URL_SYNC" not in os.environ:
+    os.environ["DATABASE_URL_SYNC"] = "sqlite:///./researchmind_local.db"
+
 from sqlalchemy import select
 from app.database.session import AsyncSessionLocal, init_db
 from app.evaluation.metrics import precision_at_k, recall_at_k, reciprocal_rank

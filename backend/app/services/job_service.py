@@ -84,5 +84,7 @@ class JobService:
         return await self._jobs.get_active(project_id)
 
     async def cancel(self, job_id: uuid.UUID) -> None:
+        from app.workers.local import cancel
+        cancel(job_id)
         await self._jobs.update(job_id, status=JobStatus.CANCELLED)
         logger.info("job.cancelled", job_id=str(job_id))

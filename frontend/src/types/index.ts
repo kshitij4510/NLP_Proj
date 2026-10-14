@@ -59,6 +59,7 @@ export interface PaperAuthor {
 }
 
 export interface Paper {
+  raw_metadata?: Record<string, any>;
   id: string;
   project_id: string;
   doi?: string;
@@ -196,6 +197,7 @@ export interface ClaimEvidenceLink {
 }
 
 export interface Claim {
+  paper_id?: string;
   id: string;
   claim_text: string;
   verification_status: VerificationStatus;

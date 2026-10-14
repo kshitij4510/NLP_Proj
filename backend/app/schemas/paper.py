@@ -38,6 +38,7 @@ class PaperRead(IDSchema, TimestampSchema):
     source: str
     status: PaperStatus
     relevance_score: Optional[float]
+    raw_metadata: Optional[dict] = None
     authors: List[PaperAuthorRead] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)

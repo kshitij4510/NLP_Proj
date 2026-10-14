@@ -59,11 +59,11 @@ export default function EvidenceExplorerPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b pb-6">
         <div>
           <div className="flex items-center gap-2 text-primary font-semibold text-sm mb-1 uppercase tracking-wider">
-            <ShieldCheck className="h-4 w-4" /> Traceable Claim Verification (Module N & §27)
+            <ShieldCheck className="h-4 w-4" /> Verifiable Claim Provenance & Evidence Explorer
           </div>
           <h1 className="text-3xl font-bold tracking-tight">Evidence Explorer</h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Audit every scientific claim against extracted document passages. No ungrounded conclusions.
+            Audit every scientific claim against extracted document passages. Check source support before drawing conclusions.
           </p>
         </div>
 

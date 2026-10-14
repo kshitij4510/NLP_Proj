@@ -30,10 +30,9 @@ class ProjectRepository(BaseRepository[ResearchProject]):
         offset: int = 0,
         limit: int = 20,
     ) -> Tuple[List[ResearchProject], int]:
-        query = select(ResearchProject).where(ResearchProject.owner_id == owner_id)
-        count_query = select(func.count()).select_from(ResearchProject).where(
-            ResearchProject.owner_id == owner_id
-        )
+        condition = ResearchProject.owner_id == owner_id
+        query = select(ResearchProject).where(condition)
+        count_query = select(func.count()).select_from(ResearchProject).where(condition)
         if status:
             query = query.where(ResearchProject.status == status)
             count_query = count_query.where(ResearchProject.status == status)

@@ -49,7 +49,8 @@ class WorkerSettings:
         compute_embeddings_task,
     ]
 
-    redis_settings_url = settings.REDIS_URL
+    from arq.connections import RedisSettings
+    redis_settings = RedisSettings.from_dsn(settings.REDIS_URL)
 
     # Worker pool settings
     max_jobs = settings.WORKER_CONCURRENCY
@@ -66,7 +67,6 @@ class WorkerSettings:
 
 
 if __name__ == "__main__":
-    import asyncio
     from arq import run_worker
 
-    asyncio.run(run_worker(WorkerSettings))
+    run_worker(WorkerSettings)

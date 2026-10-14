@@ -30,6 +30,7 @@ class DenseRetriever:
         top_k: int = 20,
         year_min: Optional[int] = None,
         year_max: Optional[int] = None,
+        paper_id: Optional[str] = None,
     ) -> List[Tuple[uuid.UUID, float]]:
         """
         Returns list of (chunk_id, cosine_similarity) sorted descending.
@@ -43,6 +44,7 @@ class DenseRetriever:
             top_k=top_k,
             year_min=year_min,
             year_max=year_max,
+            paper_id=paper_id,
         )
 
         # results is list of (PaperChunk, similarity_score)

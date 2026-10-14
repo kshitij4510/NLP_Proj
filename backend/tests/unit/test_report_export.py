@@ -74,4 +74,6 @@ async def test_report_to_markdown_and_bibtex(db: AsyncSession):
 
     # Test BibTeX export
     bib = await svc.to_bibtex(report.id)
-    assert "@article{asai2023selfrag" in bib
+    assert "@misc{" in bib
+    assert "title = {Self-RAG:" in bib
+    assert "year = {2023}" in bib

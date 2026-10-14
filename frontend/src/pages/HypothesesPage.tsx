@@ -1,3 +1,5 @@
+import { useSearchParams } from "react-router-dom";
+import { errorMessage } from "@/lib/errors";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
@@ -24,7 +26,7 @@ export default function HypothesesPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: projects } = useProjects({ page_size: 50 });
-  const [selectedProjectId, setSelectedProjectId] = useState<string>("");
+  const [selectedProjectId, setSelectedProjectId] = useState<string>(useSearchParams()[0].get("project") || "");
 
   const { data: hypData, isLoading } = useQuery({
     queryKey: ["hypotheses", selectedProjectId],
@@ -44,11 +46,12 @@ export default function HypothesesPage() {
 
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-6">
+      {(designMutation.error) && <p role="alert" className="text-destructive">{errorMessage(designMutation.error)}</p>}
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b pb-6">
         <div>
           <div className="flex items-center gap-2 text-primary font-semibold text-sm mb-1 uppercase tracking-wider">
-            <FlaskConical className="h-4 w-4" /> Hypothesis Lab (Module J & §24)
+            <FlaskConical className="h-4 w-4" /> Falsifiable Hypothesis Formulation Lab
           </div>
           <h1 className="text-3xl font-bold tracking-tight">Formulated Research Hypotheses</h1>
           <p className="text-muted-foreground text-sm mt-1">

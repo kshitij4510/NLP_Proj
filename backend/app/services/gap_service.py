@@ -49,9 +49,23 @@ class GapService:
         """
         from app.services.llm_service import LLMService
 
-        prompt = GAP_PROMPT.format(synthesis=str(synthesis)[:3000])
+        prompt = GAP_PROMPT.format(synthesis=str(synthesis)[:3000]) + "\nEvidence:\n" + str(evidence_snippets)[:18000]
         llm = LLMService()
-        raw_gaps = await llm.generate_json_list(prompt)
+        from app.core.config import settings
+        if settings.LLM_PROVIDER == "demo":
+            import re
+            raw_gaps = []
+            for snippet in evidence_snippets:
+                for sentence in re.split(r"(?<=[.!?])\s+", snippet.get("content", "")):
+                    if len(sentence) > 60 and re.search(r"\b(limited|limitation|limitations|however|challenge|challenges|lack)\b", sentence, re.I):
+                        raw_gaps.append({"title": "Potential limitation: " + snippet.get("paper_title", "Source")[:160],
+                            "description": "Potential research gap based on this source statement: " + sentence + " Coverage must be checked against further literature.",
+                            "gap_type": "empirical", "importance": 0.5, "supporting_evidence": [sentence]})
+                        break
+                if len(raw_gaps) >= 5:
+                    break
+        else:
+            raw_gaps = await llm.generate_json_list(prompt)
 
         created: List[ResearchGap] = []
         for g in raw_gaps:
@@ -59,6 +73,11 @@ class GapService:
             supporting_ids = self._resolve_paper_ids(
                 g.get("supporting_evidence", []), evidence_snippets
             )
+            if not supporting_ids:
+                continue
+            existing = await self._gaps.first(project_id=project_id, title=g.get("title", "Unnamed gap")[:500])
+            if existing:
+                continue
             gap_type = self._parse_gap_type(g.get("gap_type", "empirical"))
             gap = await self._gaps.create(
                 project_id=project_id,

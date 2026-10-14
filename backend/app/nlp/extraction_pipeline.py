@@ -147,6 +147,34 @@ class ExtractionPipeline:
                         except Exception as exc:
                             logger.warning("extraction.relation_persist_error", error=str(exc))
 
+        from app.models.knowledge import ArtifactType, VerificationStatus
+        from app.repositories.knowledge_repo import ClaimRepository, ClaimEvidenceRepository
+        from app.repositories.paper_repo import PaperRepository
+        import re
+        extracted = {}
+        entities, _ = await self._entities_repo.list(paper_id=paper_id, limit=1000)
+        for entity in entities:
+            extracted.setdefault(entity.entity_type.value, [])
+            if entity.name not in extracted[entity.entity_type.value]:
+                extracted[entity.entity_type.value].append(entity.name)
+        for chunk_record, chunk in chunk_records:
+            observation = next((sentence.strip() for sentence in re.split(r"(?<=[.!?])\s+", chunk.content) if len(sentence.strip()) >= 60), None)
+            if not observation:
+                continue
+            claim = await ClaimRepository(self._db).create(project_id=project_id, paper_id=paper_id,
+                claim_text=observation, source_chunk_id=chunk_record.id,
+                artifact_type=ArtifactType.EVIDENCE, verification_status=VerificationStatus.SUPPORTED,
+                attributes={"verification_method": "verbatim_source", "scope": "The source states this; independent scientific validity has not been established."})
+            await ClaimEvidenceRepository(self._db).create(claim_id=claim.id, paper_id=paper_id,
+                chunk_id=chunk_record.id, section_id=chunk_record.section_id, page_number=chunk_record.page_number,
+                evidence_snippet=observation, support_type=VerificationStatus.SUPPORTED, relevance_score=1.0)
+        paper = await PaperRepository(self._db).get(paper_id)
+        text = " ".join(sec.get("content", "") for sec in sections)
+        limitation = next((sentence.strip() for sentence in re.split(r"(?<=[.!?])\s+", text)
+            if re.search(r"\b(limitation|limited|however|challenge|lack)\b", sentence, re.I)), None)
+        await PaperRepository(self._db).update(paper_id, raw_metadata={**(paper.raw_metadata or {}),
+            "extracted_entities": extracted, "limitation_excerpt": limitation})
+
         # Step 6 — keyphrases (store in paper metadata, not a separate table)
         full_text = " ".join(sec.get("content", "") for sec in sections)
         keyphrases = extract_keyphrases(full_text[:5000], top_n=15)

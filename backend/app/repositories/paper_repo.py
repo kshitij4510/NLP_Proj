@@ -82,7 +82,6 @@ class PaperRepository(BaseRepository[Paper]):
                 and_(
                     Paper.project_id == project_id,
                     Paper.status == PaperStatus.DISCOVERED,
-                    Paper.pdf_url.isnot(None),
                 )
             )
             .limit(limit)
@@ -151,11 +150,58 @@ class PaperChunkRepository(BaseRepository[PaperChunk]):
         top_k: int = 20,
         year_min: Optional[int] = None,
         year_max: Optional[int] = None,
+        paper_id: Optional[str] = None,
     ) -> List[Tuple[PaperChunk, float]]:
         """
         pgvector cosine similarity search within a project.
         Returns (chunk, distance) pairs ordered by similarity.
         """
+        has_pgvector = self.db.bind.dialect.name == "postgresql" and hasattr(PaperChunk.embedding, "cosine_distance")
+        if not has_pgvector:
+            # Fallback for SQLite / in-memory cosine similarity
+            query = (
+                select(PaperChunk)
+                .join(Paper, PaperChunk.paper_id == Paper.id)
+                .where(
+                    and_(
+                        Paper.project_id == project_id,
+                        PaperChunk.embedding.isnot(None),
+                    )
+                )
+            )
+            if paper_id:
+                query = query.where(Paper.id == uuid.UUID(str(paper_id)))
+            if year_min is not None:
+                query = query.where(Paper.year >= year_min)
+            if year_max is not None:
+                query = query.where(Paper.year <= year_max)
+
+            result = await self.db.execute(query)
+            chunks = list(result.scalars().all())
+            if not chunks:
+                return []
+
+            import json
+            import math
+            scored: List[Tuple[PaperChunk, float]] = []
+            q_norm = math.sqrt(sum(x * x for x in query_embedding)) or 1.0
+            for c in chunks:
+                emb = c.embedding
+                if isinstance(emb, str):
+                    try:
+                        emb = json.loads(emb)
+                    except Exception:
+                        continue
+                if not emb or not isinstance(emb, (list, tuple)):
+                    continue
+                dot = sum(a * b for a, b in zip(query_embedding, emb))
+                c_norm = math.sqrt(sum(x * x for x in emb)) or 1.0
+                sim = dot / (q_norm * c_norm)
+                scored.append((c, float(sim)))
+
+            scored.sort(key=lambda x: x[1], reverse=True)
+            return scored[:top_k]
+
         # Build base query using pgvector's <=> operator (cosine distance)
         embedding_str = "[" + ",".join(str(v) for v in query_embedding) + "]"
 
@@ -173,6 +219,8 @@ class PaperChunkRepository(BaseRepository[PaperChunk]):
             )
         )
 
+        if paper_id:
+            query = query.where(Paper.id == uuid.UUID(str(paper_id)))
         if year_min is not None:
             query = query.where(Paper.year >= year_min)
         if year_max is not None:
