@@ -32,7 +32,9 @@ os.environ["DATABASE_URL_SYNC"] = f"sqlite:///{LOCAL_DB}"
 os.environ.setdefault("EMBEDDING_MODEL", "lexical-hash")
 
 from dotenv import load_dotenv
-load_dotenv(LOCAL_DIR / ".env.local", override=True)
+# Keep Render (and any caller-provided environment) settings authoritative.
+# The local file only fills in values that are not already configured.
+load_dotenv(LOCAL_DIR / ".env.local", override=False)
 
 # Ensure our sqlite URL wins even if .env.local had something else
 os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{LOCAL_DB}"
