@@ -114,6 +114,29 @@ async def _local_init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     await engine.dispose()
+
+    # The public demo login is advertised by the frontend, so make sure its
+    # account exists whenever the ephemeral demo database is initialized.
+    from app.database.session import AsyncSessionLocal
+    from app.repositories.user_repo import UserRepository
+    from app.schemas.auth import UserRegister
+    from app.services.auth_service import AuthService
+
+    demo_email = os.getenv("DEMO_ACCOUNT_EMAIL", "researcher@example.com")
+    demo_password = os.getenv("DEMO_ACCOUNT_PASSWORD", "ResearchPass123")
+    async with AsyncSessionLocal() as db:
+        if await UserRepository(db).get_by_email(demo_email) is None:
+            await AuthService(db).register(
+                UserRegister(
+                    email=demo_email,
+                    username="researcher",
+                    password=demo_password,
+                    full_name="Dr. Alex Vance",
+                )
+            )
+            await db.commit()
+            print(f"[OK] Demo account initialized: {demo_email}")
+
     from app.workers.local import recover_interrupted_jobs
     await recover_interrupted_jobs()
     print("[OK] SQLite database tables created")
