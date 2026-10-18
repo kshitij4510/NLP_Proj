@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
+from sqlalchemy import text
 from sqlalchemy.pool import NullPool
 
 from app.core.config import settings
@@ -62,6 +63,10 @@ async def init_db() -> None:
     import app.models  # noqa: F401
 
     async with engine.begin() as conn:
+        if engine.dialect.name == "postgresql":
+            # Render's managed Postgres does not run docker/postgres/init.sql.
+            for extension in ("vector", "uuid-ossp", "pg_trgm", "btree_gin"):
+                await conn.execute(text(f'CREATE EXTENSION IF NOT EXISTS "{extension}"'))
         await conn.run_sync(Base.metadata.create_all)
     logger.info("Database tables initialized")
 

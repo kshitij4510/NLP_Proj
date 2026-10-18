@@ -35,6 +35,22 @@ class Settings(BaseSettings):
     # ── Database ──────────────────────────────
     DATABASE_URL: str = "postgresql+asyncpg://researchmind:researchmind_secret@localhost:5432/researchmind"
     DATABASE_URL_SYNC: str = "postgresql+psycopg2://researchmind:researchmind_secret@localhost:5432/researchmind"
+
+    @field_validator("DATABASE_URL", mode="before")
+    @classmethod
+    def use_async_postgres_driver(cls, value: Any) -> Any:
+        # Render's Postgres connectionString uses the generic postgresql:// scheme.
+        # The async application engine requires asyncpg explicitly.
+        if isinstance(value, str) and value.startswith("postgresql://"):
+            return value.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return value
+
+    @field_validator("DATABASE_URL_SYNC", mode="before")
+    @classmethod
+    def use_sync_postgres_driver(cls, value: Any) -> Any:
+        if isinstance(value, str) and value.startswith("postgresql://"):
+            return value.replace("postgresql://", "postgresql+psycopg2://", 1)
+        return value
     DB_POOL_SIZE: int = 10
     DB_MAX_OVERFLOW: int = 20
     DB_POOL_TIMEOUT: int = 30
