@@ -20,7 +20,7 @@ services:
       - key: EMBEDDING_MODEL
         value: lexical-hash
       - key: CORS_ORIGINS
-        value: https://researchmind-web-demo.onrender.com
+        value: '["https://researchmind-web-demo.onrender.com"]'
       - key: UPLOAD_DIR
         value: /tmp/researchmind-uploads
 
