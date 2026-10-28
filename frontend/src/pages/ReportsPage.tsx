@@ -14,7 +14,8 @@ import type { Report } from "@/types";
 
 export default function ReportsPage() {
   const { data: projects } = useProjects({ page_size: 50 });
-  const [selectedProject, setSelectedProject] = useState(useSearchParams()[0].get("project") || "");
+  const [projectChoice, setSelectedProject] = useState(useSearchParams()[0].get("project") || "");
+  const selectedProject = projectChoice || projects?.items[0]?.id || "";
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
 
   const { data: reports, refetch } = useQuery({
@@ -63,7 +64,7 @@ export default function ReportsPage() {
         </Button>
       </div>
 
-      <ManuscriptStudio key={selectedProject} projectId={selectedProject} onReport={(report)=>{setSelectedReport(report);refetch();}} />
+      <ManuscriptStudio projectId={selectedProject} onProjectCreated={setSelectedProject} onReport={(report)=>{setSelectedReport(report);refetch();}} />
       {(generate.error || download.error) && <p role="alert" className="text-destructive">{errorMessage(generate.error || download.error)}</p>}
       {selectedReport && <div className="flex gap-2 flex-wrap">
         <Button disabled={download.isPending} onClick={() => download.mutate("ieee")}>Download IEEE Paper (.tex)</Button>

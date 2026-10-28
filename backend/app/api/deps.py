@@ -16,11 +16,11 @@ from app.database.session import get_db
 from app.models.user import User
 from app.repositories.user_repo import UserRepository
 
-_bearer = HTTPBearer(auto_error=True)
+_bearer = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
-    credentials: Annotated[HTTPAuthorizationCredentials, Depends(_bearer)],
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> User:
     """Validate JWT and return the current user."""
@@ -29,6 +29,8 @@ async def get_current_user(
         detail="Invalid authentication credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    if credentials is None:
+        raise credentials_exception
     try:
         payload = decode_token(credentials.credentials)
         user_id: str = payload.get("sub")

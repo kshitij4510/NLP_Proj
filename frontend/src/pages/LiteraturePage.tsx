@@ -8,16 +8,16 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
-  BookOpen, ExternalLink, Table as TableIcon, ListFilter,
-  Search, FileText, ArrowUpDown, Filter, Sparkles
+  BookOpen, ExternalLink, Table as TableIcon,
+  Search, FileText
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { errorMessage } from "@/lib/errors";
-import type { Paper } from "@/types";
 
 export default function LiteraturePage() {
-  const { data: projects } = useProjects({ page_size: 200 });
-  const [selectedProjectId, setSelectedProjectId] = useState<string>(useSearchParams()[0].get("project") || "");
+  const { data: projects, isLoading: projectsLoading, error: projectsError } = useProjects({ page_size: 100 });
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedProjectId = searchParams.get("project") || projects?.items[0]?.id || "";
   const [searchFilter, setSearchFilter] = useState<string>("");
   const [discoveryQuery, setDiscoveryQuery] = useState("retrieval augmented generation hallucination");
   const [activeTab, setActiveTab] = useState<"papers" | "matrix">("matrix");
@@ -37,7 +37,7 @@ export default function LiteraturePage() {
   );
 
   const discover = useMutation({
-    mutationFn: () => papersApi.discover(selectedProjectId, discoveryQuery),
+    mutationFn: () => papersApi.discover(selectedProjectId, discoveryQuery.trim()),
     onSuccess: () => refetch(),
   });
   return (
@@ -58,9 +58,16 @@ export default function LiteraturePage() {
           <select
             className="h-10 rounded-lg border border-input bg-card px-3 py-2 text-sm shadow-sm"
             value={selectedProjectId}
-            onChange={(e) => setSelectedProjectId(e.target.value)}
+            disabled={projectsLoading || discover.isPending}
+            onChange={(e) => {
+              const params = new URLSearchParams(searchParams);
+              params.set("project", e.target.value);
+              setSearchParams(params);
+              setSearchFilter("");
+              discover.reset();
+            }}
           >
-            <option value="">Select project…</option>
+            <option value="" disabled>{projectsLoading ? "Loading projects…" : "Select project…"}</option>
             {projects?.items.map((p) => (
               <option key={p.id} value={p.id}>{p.title}</option>
             ))}
@@ -90,6 +97,8 @@ export default function LiteraturePage() {
         </div>
       </div>
 
+      {projectsError && <p role="alert" className="text-destructive">Could not load projects: {errorMessage(projectsError)}</p>}
+      {!projectsLoading && !projectsError && !projects?.items.length && <p className="text-sm">Create a project to discover and organize papers. <Link to="/projects/new" className="text-primary underline">Create project</Link></p>}
       {/* Filter bar */}
       <div className="flex items-center gap-3">
         <div className="relative flex-1">
@@ -105,11 +114,11 @@ export default function LiteraturePage() {
 
       <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); discover.mutate(); }}>
         <Input value={discoveryQuery} onChange={(e) => setDiscoveryQuery(e.target.value)} placeholder="Academic discovery query" />
-        <Button disabled={!selectedProjectId || !discoveryQuery.trim() || discover.isPending}> {discover.isPending ? "Discovering?" : "Discover Papers"}</Button>
+        <Button disabled={!selectedProjectId || discoveryQuery.trim().length < 3 || discover.isPending}> {discover.isPending ? "Discovering…" : "Discover Papers"}</Button>
       </form>
       {(error || discover.error) && <p role="alert" className="text-destructive">{errorMessage(error || discover.error)}</p>}
       {discover.data && <p className="text-sm">Added {discover.data.added} papers; skipped {discover.data.skipped} duplicates.</p>}
-      {isLoading ? (
+      {projectsLoading || (isLoading && !!selectedProjectId) ? (
         <div className="flex h-64 items-center justify-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
         </div>
@@ -142,7 +151,7 @@ export default function LiteraturePage() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {filteredPapers.map((paper, idx) => {
+                {filteredPapers.map((paper) => {
                   const extracted = paper.raw_metadata?.extracted_entities || {};
                   const method = (extracted.METHOD || []).join(", ") || "Not extracted";
                   const datasets = (extracted.DATASET || []).join(", ") || "Not extracted";
@@ -195,7 +204,7 @@ export default function LiteraturePage() {
                 {filteredPapers.length === 0 && (
                   <tr>
                     <td colSpan={6} className="p-8 text-center text-muted-foreground text-sm">
-                      No literature matches your query. Select another project or run discovery.
+                      {!selectedProjectId ? "Create a project to start discovering papers." : papers.length === 0 ? "This project has no papers yet. Use Discover Papers above or upload a PDF on Dashboard." : "No papers match this filter. Clear the filter to show your project papers."}
                     </td>
                   </tr>
                 )}

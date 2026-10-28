@@ -81,3 +81,57 @@ async def test_public_github_archive_inspection(client,sample_user_data,monkeypa
     assert response.status_code==200,response.text
     assert response.json()["source"]=="https://github.com/example/retrieval"
     assert "multilingual" in response.json()["gaps"][0]["evidence"]
+
+@pytest.mark.asyncio
+async def test_unreadable_pdf_leaves_no_paper_or_file(client, sample_user_data, monkeypatch, tmp_path):
+    import fitz
+    monkeypatch.setattr(settings, "UPLOAD_DIR", str(tmp_path))
+    project = await login_project(client, sample_user_data)
+    document = fitz.open()
+    document.new_page()
+    payload = document.tobytes()
+    document.close()
+    response = await client.post(f"/api/v1/projects/{project}/manuscripts", files={"file": ("blank.pdf", payload, "application/pdf")})
+    assert response.status_code == 422, response.text
+    papers = await client.get(f"/api/v1/projects/{project}/papers")
+    assert papers.json()["total"] == 0
+    assert list(tmp_path.iterdir()) == []
+
+@pytest.mark.asyncio
+async def test_synthesis_cannot_replace_checked_source_evidence(client, sample_user_data, monkeypatch):
+    from app.services.llm_service import LLMService
+    monkeypatch.setattr(settings, "LLM_PROVIDER", "openai")
+    async def generated(*args, **kwargs):
+        return '{"abstract":"A synthesized draft.","research_gaps_section":"Ablations are missing."}'
+    monkeypatch.setattr(LLMService, "generate_text", generated)
+    project = await login_project(client, sample_user_data)
+    source = "Our approach fails on multilingual queries in unseen domains. We run retrieval ablations on the test set. Code is available on GitHub for all experiments."
+    response = await client.post(f"/api/v1/projects/{project}/manuscripts", files={"file": ("study.md", source)})
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert result["report"]["abstract"] == "A synthesized draft."
+    assert "Ablations are missing" not in result["report"]["research_gaps_section"]
+    assert "Documentation checks" in result["report"]["research_gaps_section"]
+    assert next(check for check in result["review_checks"] if check["topic"] == "Ablation")["status"] == "mention located"
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("filename", ["verirag_demo_paper.pdf", "verirag_demo_project.zip", "verirag_demo_project.md"])
+async def test_demo_kit_analysis_and_exports(client, sample_user_data, monkeypatch, tmp_path, filename):
+    from pathlib import Path
+    from app.nlp.embeddings import EmbeddingEngine
+    monkeypatch.setattr(settings, "LLM_PROVIDER", "demo")
+    monkeypatch.setattr(settings, "EMBEDDING_MODEL", "lexical-hash")
+    monkeypatch.setattr(settings, "UPLOAD_DIR", str(tmp_path))
+    monkeypatch.setattr(EmbeddingEngine, "_instance", None)
+    source = Path(__file__).resolve().parents[3] / "output" / "pdf" / filename
+    if not source.exists():
+        pytest.skip("Generate optional demo kit with scripts/create_demo_kit.py")
+    project = await login_project(client, sample_user_data)
+    response = await client.post(f"/api/v1/projects/{project}/manuscripts", files={"file": (filename, source.read_bytes())})
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert any("multilingual" in gap["evidence"] for gap in data["gaps"])
+    for fmt in ("ieee", "markdown", "bibtex"):
+        export = await client.get(f"/api/v1/projects/{project}/reports/{data['report']['id']}/export/{fmt}")
+        assert export.status_code == 200, export.text
+        assert export.content

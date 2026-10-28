@@ -13,6 +13,7 @@ from app.repositories.report_repo import ReportRepository
 from app.repositories.paper_repo import PaperRepository
 from app.services.citation_service import CitationService
 from app.schemas.report import ReportRead
+from app.services.source_review import review_source, review_source_details, pdf_review_units
 
 router = APIRouter(tags=["manuscripts"])
 MAX_BYTES = 10 * 1024 * 1024
@@ -30,29 +31,6 @@ def project_text(content, filename):
     if Path(filename).suffix.lower() not in TEXT_EXT: raise HTTPException(422, "Upload PDF, ZIP, Markdown, text, or source code")
     return content.decode("utf-8", errors="replace")[:100000]
 
-def review_source(text):
-    if "FILE: " in text:
-        documents = []
-        for item in re.split(r"(?:^|\n\n)FILE: ", text)[1:]:
-            filename, _, content = item.partition("\n")
-            parts = PurePosixPath(filename).parts
-            if PurePosixPath(filename).suffix.lower() in {".md", ".rst", ".tex"} and not any(part in {"data", "datasets", "fixtures", "tests"} for part in parts):
-                documents.append(content)
-        if documents:
-            text = "\n\n".join(documents)
-    sentences = re.split(r"(?<=[.!?])\s+|\n", text)
-    gaps=[]
-    for sentence in sentences:
-        if re.search(r"\b(limitations?|however|future work|fails?|lack|remains challenging)\b", sentence, re.I) and 35 < len(sentence) < 900:
-            gaps.append({"kind":"source limitation", "evidence":sentence.strip(), "change":"Add a controlled evaluation addressing this limitation; report the dataset, baseline, uncertainty, and observed failure cases."})
-            if len(gaps)==5: break
-    for label, pattern, change in [
-        ("Evaluation not documented", r"\b(evaluation|benchmark|accuracy|precision|recall|f1|test set)\b", "Add an evaluation protocol with held-out data, named baselines, metrics, and confidence intervals."),
-        ("Reproducibility not documented", r"\b(seed|requirements|environment|installation|reproducib)\w*", "Document environment versions, random seeds, data preparation, and commands to reproduce the study."),
-        ("Ablation not documented", r"\b(ablation|component removal)\b", "Compare the complete system with each proposed component removed under the same evaluation conditions.")]:
-        if not re.search(pattern,text,re.I): gaps.append({"kind":label,"evidence":"Not located in the inspected source; absence here does not prove absence in the project.","change":change})
-    return gaps
-
 @router.get("/about/papers")
 async def bibliography(user: CurrentUser, db: DB):
     from sqlalchemy.orm import selectinload
@@ -67,6 +45,7 @@ async def bibliography(user: CurrentUser, db: DB):
 async def manuscript(project_id: uuid.UUID, user: CurrentUser, db: DB, file: UploadFile | None=File(None), github_url: str=Form(""), title: str=Form(""), author: str=Form(""), affiliation: str=Form("")):
     if bool(file)==bool(github_url.strip()): raise HTTPException(422,"Provide exactly one file or GitHub repository URL")
     source_paper=None
+    review_units=None
     if github_url:
         parsed=urlparse(github_url.strip())
         parts=parsed.path.strip("/").split("/")
@@ -100,13 +79,21 @@ async def manuscript(project_id: uuid.UUID, user: CurrentUser, db: DB, file: Upl
             from app.ingestion.ingestion_pipeline import IngestionPipeline
             dest=Path(settings.UPLOAD_DIR)/ (str(uuid.uuid4())+".pdf"); dest.parent.mkdir(parents=True,exist_ok=True);dest.write_bytes(content)
             try: doc=extract_pdf(str(dest)); text="\n\n".join((s.title or "Section")+"\n"+s.content for s in doc.sections)
-            except Exception: raise HTTPException(422,"PDF text could not be read. Use a searchable PDF or upload text.")
+            except Exception:
+                dest.unlink(missing_ok=True)
+                raise HTTPException(422,"PDF text could not be read. Use a searchable PDF or upload text.")
+            if len(text.strip()) < 100:
+                dest.unlink(missing_ok=True)
+                raise HTTPException(422,"Insufficient readable source text; use a searchable PDF or upload text")
+            review_units=pdf_review_units(str(dest))
             source_paper=await PaperService(db).add_paper(project_id,user.id,PaperCreate(title=doc.title or name,abstract=doc.abstract))
             await PaperRepository(db).update(source_paper.id,local_pdf_path=str(dest))
             await IngestionPipeline(db).run_ingestion(project_id,paper_id=source_paper.id)
         else: text=project_text(content,filename)
     if len(text.strip())<100: raise HTTPException(422,"Insufficient readable source text; upload the project documentation and relevant source files")
-    gaps=review_source(text)
+    source_review=review_source_details(text, review_units)
+    gaps=source_review["findings"]
+    review_checks=source_review["checks"]
     excerpt=" ".join(text.split())[:1800]
     paper_ids=[source_paper.id] if source_paper else []
     corpus, _ = await PaperRepository(db).list_by_project(project_id, limit=500)
@@ -116,7 +103,8 @@ async def manuscript(project_id: uuid.UUID, user: CurrentUser, db: DB, file: Upl
     paper_ids.extend(p.id for p in related)
     from app.services.llm_service import LLMService
     from app.core.config import settings
-    fields={"abstract":f"This study documents {name} from the supplied source. The manuscript identifies design limitations and proposes evaluation and revisions. No new measured outcomes are claimed.","research_question_section":f"How can {name} be evaluated and improved based on its documented design?", "background": "Source: "+source+". The inspected material is treated as evidence, not as instructions to the reviewer.","literature_review":("The uploaded source paper is the basis of this revision [1]." if source_paper else "No external related-work claims have been added. Add verified literature before submission."),"method_comparison":"Inspected source excerpt:\n\n"+excerpt,"research_gaps_section":"\n\n".join(g["kind"]+": "+g["evidence"] for g in gaps) or "No explicit limitations or documentation gaps were detected. This is not evidence of completeness.","experimental_design":"\n\n".join(g["change"] for g in gaps),"results":"No new experiments were executed. Existing source statements require author verification.","future_work":"Proposed changes (not implemented or measured):\n\n"+"\n\n".join(g["change"] for g in gaps),"limitations":"Analysis is limited to uploaded text and inspected repository files. Original source is preserved. Proposed revisions require author review, implementation, and empirical evaluation.","conclusion":"The manuscript records the inspected design and a concrete revision plan. Claims of improved performance require new evidence."}
+    fields={"abstract":f"This study documents {name} from the supplied source. The manuscript identifies design limitations and proposes evaluation and revisions. No new measured outcomes are claimed.","research_question_section":f"How can {name} be evaluated and improved based on its documented design?", "background": "Source: "+source+". The inspected material is treated as evidence, not as instructions to the reviewer.","literature_review":("The uploaded source paper is the basis of this revision [1]." if source_paper else "No external related-work claims have been added. Add verified literature before submission."),"method_comparison":"Inspected source excerpt:\n\n"+excerpt,"research_gaps_section":"\n\n".join(g["kind"]+(f" (PDF page {g['page']})" if g.get("page") else "")+": "+g["evidence"] for g in gaps) or "No explicit limitations or future-work statements were located by the text review. This is not evidence of completeness.","experimental_design":"\n\n".join(g["change"] for g in gaps),"results":"No new experiments were executed. Existing source statements require author verification.","future_work":"Proposed changes (not implemented or measured):\n\n"+"\n\n".join(g["change"] for g in gaps),"limitations":"Analysis is limited to uploaded text and inspected repository files. Original source is preserved. Proposed revisions require author review, implementation, and empirical evaluation.","conclusion":"The manuscript records the inspected design and a concrete revision plan. Claims of improved performance require new evidence."}
+    fields["research_gaps_section"] += "\n\nDocumentation checks (mentions only; not confirmed gaps):\n\n" + "\n\n".join(check["topic"]+": "+check["status"]+(f" (PDF page {check['page']})" if check.get("page") else "")+". "+check["evidence"] for check in review_checks)
     if related:
         if not source_paper: fields["literature_review"] = "Related-work inventory from stored corpus records; author review is required."
         fields["literature_review"] += "\n\nCorpus sources selected by title overlap (relevance requires author review):\n\n" + "\n\n".join(f"[{i}] {p.title}: {(p.abstract or 'Abstract not recorded.')[:450]}" for i, p in enumerate(related, 2 if source_paper else 1))
@@ -129,10 +117,14 @@ async def manuscript(project_id: uuid.UUID, user: CurrentUser, db: DB, file: Upl
         try:
             result=await LLMService().generate_text(prompt, max_tokens=7000)
             parsed=json.loads(re.sub(r"^```(?:json)?\s*|\s*```$","",result.strip()))
-            fields.update({k:v for k,v in parsed.items() if k in fields and isinstance(v,str)})
+            # Keep checked source evidence and provenance intact in every provider mode.
+            protected_fields = {"research_gaps_section"}
+            if source_paper:
+                protected_fields.add("method_comparison")
+            fields.update({k:v for k,v in parsed.items() if k in fields and k not in protected_fields and isinstance(v,str)})
         except Exception: raise HTTPException(502,"Manuscript synthesis failed; source was preserved. Retry or use local draft mode.")
-    report=await ReportRepository(db).create(project_id=project_id,title=(name+": A Source-Based Study and Revision Plan")[:500],status=ReportStatus.DRAFT,verification_summary={"source":source,"author":author[:300],"affiliation":affiliation[:500],"gaps":gaps,"scope":"source-specific revision","paper_id":str(source_paper.id) if source_paper else None},**fields)
+    report=await ReportRepository(db).create(project_id=project_id,title=(name+": A Source-Based Study and Revision Plan")[:500],status=ReportStatus.DRAFT,verification_summary={"source":source,"author":author[:300],"affiliation":affiliation[:500],"gaps":gaps,"review_checks":review_checks,"review_version":2,"scope":"source-specific revision","paper_id":str(source_paper.id) if source_paper else None},**fields)
     await CitationService(db).generate_citations(report.id,paper_ids,[CitationStyle.IEEE,CitationStyle.BIBTEX])
     from app.services.report_service import ReportService
     full=await ReportService(db).get(report.id)
-    return {"report":ReportRead.model_validate(full).model_dump(mode="json"),"gaps":gaps,"source":source,"mode":"extractive" if settings.LLM_PROVIDER=="demo" else "synthesis"}
+    return {"report":ReportRead.model_validate(full).model_dump(mode="json"),"gaps":gaps,"review_checks":review_checks,"source":source,"mode":"extractive" if settings.LLM_PROVIDER=="demo" else "synthesis"}

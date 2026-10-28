@@ -40,6 +40,8 @@ frontend/.vite/
 backend/uploads/
 backend/models_cache/
 *.pdf
+!output/pdf/researchmind_viva_guide.pdf
+!output/pdf/verirag_demo_paper.pdf
 
 # ── Docker volumes (local dev) ────────────────────────────────────────────────
 docker/postgres/data/

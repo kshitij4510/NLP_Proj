@@ -1,4 +1,6 @@
 # Development-only dependencies
+# Worker configuration is covered by the runtime tests, including in local mode.
+arq==0.25.0
 pytest==8.2.1
 pytest-asyncio==0.23.6
 pytest-cov==5.0.0

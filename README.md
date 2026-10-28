@@ -49,6 +49,8 @@ Research Question
 
 ## Quick Start
 
+For a ready-to-use searchable paper, source ZIP, and step-by-step demonstration, see [Demo walkthrough](docs/demo-walkthrough.md). Sample inputs are in `output/pdf/` and can be regenerated with `python scripts/create_demo_kit.py`.
+
 ### Option A: Local Standalone Mode (No Docker or Redis Required)
 
 ResearchMind supports native in-process execution with SQLite (`aiosqlite`) and in-process background workers for local development and offline evaluation:

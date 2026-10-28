@@ -84,7 +84,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <ManuscriptStudio key={effectiveProjectId} projectId={effectiveProjectId} paperOnly />
+      <ManuscriptStudio projectId={effectiveProjectId} onProjectCreated={setSelectedProjectId} paperOnly />
       {/* Research progress */}
       <div>
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3">
